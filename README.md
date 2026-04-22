@@ -31,18 +31,21 @@
 
 ## 安装步骤
 
-### 1. 安装 Ollama
+### 1. 克隆项目
 
 ```bash
-# 下载并安装 Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+# 克隆项目到本地
+git clone <your-repository-url>
+cd ollama-prompt-autowrite
 
-# 启动 Ollama 服务
-sudo systemctl start ollama
-sudo systemctl enable ollama
+# 创建虚拟环境
+python3 -m venv venv
 
-# 拉取 qwen3.5 模型
-ollama pull qwen3.5
+# 激活虚拟环境
+source venv/bin/activate
+
+# 安装依赖
+pip install requests
 ```
 
 ### 2. 克隆项目
@@ -66,9 +69,17 @@ pip install -r requirements.txt
 
 ### 1. 准备文章
 
-将需要改写的文章放入 `new` 目录中，文章格式应为 Markdown 文件。
+将需要改写的文章放入 `new` 目录中，文章格式应为 Markdown 文件或 JSON 文件（JSON文件需包含text字段）。
 
-### 2. 运行脚本
+### 2. 配置 Ollama API
+
+确保 Ollama 服务正在运行，并且 qwen3.5 模型已安装。脚本会自动连接到本地 Ollama API 服务：
+
+- API 地址：`http://localhost:11434/api/generate`
+- 使用模型：`qwen3.5:latest`
+- 超时设置：300秒（5分钟）
+
+### 3. 运行脚本
 
 #### 前台运行
 
@@ -96,7 +107,7 @@ ps aux | grep process_articles.py
 tail -f process.log
 ```
 
-### 3. 查看结果
+### 4. 查看结果
 
 - 改写后的文章会保存在 `output` 目录中，使用原文件名
 - 原文章会被移动到 `old` 目录中

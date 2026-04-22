@@ -31,17 +31,7 @@
 
 ## 安装步骤
 
-### 1. 安装 Ollama
-
-1. 访问 [Ollama 官网](https://ollama.com/) 下载 Windows 版本
-2. 运行安装程序，按照提示完成安装
-3. 安装完成后，Ollama 服务会自动启动
-4. 打开命令提示符或 PowerShell，运行以下命令拉取 qwen3.5 模型：
-   ```powershell
-   ollama pull qwen3.5
-   ```
-
-### 2. 克隆项目
+### 1. 克隆项目
 
 1. 打开命令提示符或 PowerShell
 2. 运行以下命令克隆项目：
@@ -64,9 +54,9 @@
    .\venv\Scripts\activate.bat
    ```
 
-5. 安装依赖（如果需要）：
+5. 安装依赖：
    ```powershell
-   pip install -r requirements.txt
+   pip install requests
    ```
 
 ## 运行方法
@@ -174,30 +164,19 @@ git push
 
 ## 故障排除
 
-### 1. Ollama 服务未启动
-
-1. 打开任务管理器
-2. 查看「服务」选项卡
-3. 找到 `Ollama` 服务
-4. 右键点击并选择「启动」
-
-### 2. 模型未拉取
-
-```powershell
-# 拉取 qwen3.5 模型
-ollama pull qwen3.5
-
-# 查看已安装的模型
-ollama list
-```
-
-### 3. 权限问题
+### 1. 权限问题
 
 确保当前用户对项目目录有读写权限。
 
-### 4. Python 路径问题
+### 2. Python 路径问题
 
 确保 Python 已添加到系统环境变量中。
+
+### 3. Ollama API 连接问题
+
+- 确保 Ollama 服务正在运行
+- 确保 qwen3.5 模型已安装
+- 检查 API 地址是否正确：`http://localhost:11434/api/generate`
 
 ## 联系方式
 
