@@ -29,7 +29,7 @@ def call_ollama_api(prompt):
     """
     调用 Ollama API 生成内容
     """
-    url = "http://localhost:11434/api/generate"
+    url = "http://192.168.2.111:11434/api/generate"
     data = {
         "model": "qwen3.5:latest",  # 使用正确的模型名称
         "prompt": prompt,
