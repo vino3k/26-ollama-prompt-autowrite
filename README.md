@@ -19,6 +19,7 @@
 ├── old/              # 存放已处理的原文章
 ├── output/           # 存放改写后的文章
 ├── process_articles.py  # 主处理脚本
+├── main.py              # 监控脚本（自动监控new目录）
 ├── README.md         # Linux 环境说明
 └── README-Windows.md # Windows 环境说明
 ```
@@ -87,9 +88,6 @@ tail -f monitor.log
 - **自动处理**：检测到变化后自动执行 `process_articles.py`
 - **Ollama服务检查**：处理前会检查Ollama服务是否可用
 - **日志记录**：所有操作都会记录到日志
-```
-
-
 
 ## 运行方法
 

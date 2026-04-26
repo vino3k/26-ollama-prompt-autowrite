@@ -47,7 +47,7 @@ def scan_new_directory():
 def check_ollama_service():
     """检查Ollama服务是否可用"""
     try:
-        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        response = requests.get("http://localhost:11434/api/tags", timeout=60)
         return response.status_code == 200
     except Exception:
         return False
@@ -111,7 +111,7 @@ def main():
     while True:
         try:
             # 等待一段时间
-            time.sleep(60)  # 每60秒检查一次
+            time.sleep(600)  # 每60秒检查一次
             
             # 扫描当前目录状态
             current_files_info = scan_new_directory()
