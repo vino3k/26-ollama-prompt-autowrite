@@ -59,6 +59,49 @@
    pip install requests
    ```
 
+## 监控模式
+
+### 自动监控
+
+除了手动运行脚本外，您还可以使用 `main.py` 启动自动监控模式。该模式会每60秒检查一次new目录，当发现有新文件或文件有变化时，自动执行处理脚本。
+
+#### 前台运行
+
+```powershell
+# 激活虚拟环境（如果尚未激活）
+.\venv\Scripts\Activate.ps1  # PowerShell
+
+# 运行监控脚本
+python main.py
+```
+
+#### 后台运行
+
+```powershell
+# 激活虚拟环境（如果尚未激活）
+.\venv\Scripts\Activate.ps1
+
+# 后台运行监控脚本
+Start-Job -ScriptBlock {
+    cd "E:\00.AIGC\26-ollama-prompt-autowrite"
+    python main.py
+} -Name "OllamaMonitor"
+
+# 查看后台任务状态
+Get-Job
+
+# 查看任务输出
+Receive-Job -Name "OllamaMonitor"
+```
+
+#### 监控功能说明
+
+- **定时检查**：每60秒检查一次new目录
+- **自动检测**：通过文件哈希值检测新文件或文件变化
+- **自动处理**：检测到变化后自动执行 `process_articles.py`
+- **Ollama服务检查**：处理前会检查Ollama服务是否可用
+- **日志记录**：所有操作都会显示在控制台
+
 ## 运行方法
 
 ### 1. 准备文章

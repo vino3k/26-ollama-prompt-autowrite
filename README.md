@@ -48,6 +48,47 @@ source venv/bin/activate
 pip install requests
 ```
 
+## 监控模式
+
+### 自动监控
+
+除了手动运行脚本外，您还可以使用 `main.py` 启动自动监控模式。该模式会每60秒检查一次new目录，当发现有新文件或文件有变化时，自动执行处理脚本。
+
+#### 前台运行
+
+```bash
+# 激活虚拟环境（如果尚未激活）
+source venv/bin/activate
+
+# 运行监控脚本
+python main.py
+```
+
+#### 后台运行
+
+```bash
+# 激活虚拟环境（如果尚未激活）
+source venv/bin/activate
+
+# 后台运行监控脚本
+nohup python main.py > monitor.log 2>&1 &
+
+# 查看运行状态
+ps aux | grep main.py
+
+# 查看日志
+tail -f monitor.log
+```
+
+#### 监控功能说明
+
+- **定时检查**：每60秒检查一次new目录
+- **自动检测**：通过文件哈希值检测新文件或文件变化
+- **自动处理**：检测到变化后自动执行 `process_articles.py`
+- **Ollama服务检查**：处理前会检查Ollama服务是否可用
+- **日志记录**：所有操作都会记录到日志
+```
+
 
 
 ## 运行方法
