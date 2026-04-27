@@ -14,7 +14,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NEW_DIR = os.path.join(BASE_DIR, "new")
 OLD_DIR = os.path.join(BASE_DIR, "old")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-STANDARD_FILE = os.path.join(BASE_DIR, "01-标准模块构成.txt")
+STANDARD_FILE = os.path.join(BASE_DIR, "standard-template.txt")
 
 def load_standard_template():
     """
@@ -23,6 +23,7 @@ def load_standard_template():
     if os.path.exists(STANDARD_FILE):
         with open(STANDARD_FILE, 'r', encoding='utf-8') as f:
             return f.read()
+    print("警告: 标准模板文件不存在: {}".format(STANDARD_FILE))
     return ""
 
 def call_ollama_api(prompt):
@@ -129,11 +130,11 @@ def process_articles():
         prompt = f"""
 请按照以下标准模块构成改写文章，输出markdown格式：
 
-“”{standard_template}”“
+""{standard_template}""
 
 需要改写的文章：
 
-“”{content}”“
+""{content}""
 
 请按照上述标准模块构成，将文章改写成符合爆款文章结构的markdown格式。
 
@@ -144,6 +145,14 @@ def process_articles():
 4. 保持内容客观中立，避免使用可能被视为冒充国家机构的表述
 5. 如果引用了其他文章或信息来源，请明确注明引用来源
 6. 内容必须以中文输出
+7. 严格按照标准模块构成组织内容
+8. 使用SCQA模型构建开头
+9. 采用金字塔结构组织内容
+10. 加入适当的小标题和强调元素
+11. 保持原文的核心信息不变
+12. 输出完整的Markdown格式
+13. 确保内容符合移动端阅读体验
+14. 适当添加emoji增强可读性`;
 """
         
         # 调用 Ollama API 生成改写内容
