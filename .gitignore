@@ -1,0 +1,15 @@
+# Ignore directories with generated or temporary files
+old/
+output/
+new/
+
+# Ignore Python bytecode
+__pycache__/
+*.pyc
+
+# Ignore log files
+*.log
+
+# Ignore IDE files
+.vscode/
+.idea/
