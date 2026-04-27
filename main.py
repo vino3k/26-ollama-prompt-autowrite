@@ -47,7 +47,9 @@ def scan_new_directory():
 def check_ollama_service():
     """检查Ollama服务是否可用"""
     try:
-        response = requests.get("http://localhost:11434/api/tags", timeout=60)
+        # 从API URL中提取基础URL
+        base_url = OLLAMA_API_URL.split('/api/')[0]
+        response = requests.get(f"{base_url}/api/tags", timeout=60)
         return response.status_code == 200
     except Exception:
         return False
@@ -89,7 +91,7 @@ def main():
     print("=" * 60)
     print(f"监控目录: {NEW_DIR}")
     print(f"处理脚本: {PROCESS_SCRIPT}")
-    print(f"检查间隔: 60秒")
+    print(f"检查间隔: 600秒")
     print("=" * 60)
     
     # 检查必要的目录和文件
@@ -116,35 +118,17 @@ def main():
             # 扫描当前目录状态
             current_files_info = scan_new_directory()
             
-            # 检查是否有新文件或文件有变化
-            has_changes = False
-            
-            # 检查新增或修改的文件
-            for file_path, file_hash in current_files_info.items():
-                if file_path not in last_files_info or last_files_info[file_path] != file_hash:
-                    has_changes = True
-                    break
-            
-            # 检查是否有文件被删除（如果需要处理这种情况）
-            # for file_path in last_files_info:
-            #     if file_path not in current_files_info:
-            #         has_changes = True
-            #         break
-            
-            if has_changes:
-                print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 检测到目录变化")
-                print(f"文件数量: {len(last_files_info)} -> {len(current_files_info)}")
+            # 检查目录中是否有文件
+            if current_files_info:
+                print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 检测到目录中有文件 ({len(current_files_info)} 个)")
                 
                 # 检查Ollama服务是否可用
                 if check_ollama_service():
                     run_process_script()
                 else:
                     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Ollama服务不可用，跳过本次处理")
-                
-                # 更新文件状态
-                last_files_info = scan_new_directory()
             else:
-                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 目录无变化 ({len(current_files_info)} 个文件)")
+                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 目录中无文件")
         
         except KeyboardInterrupt:
             print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] 监控系统已停止")
