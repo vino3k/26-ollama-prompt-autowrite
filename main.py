@@ -111,7 +111,7 @@ def main():
     while True:
         try:
             # 等待一段时间
-            time.sleep(600)  # 每60秒检查一次
+            time.sleep(600)  # 每600秒检查一次
             
             # 扫描当前目录状态
             current_files_info = scan_new_directory()

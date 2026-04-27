@@ -129,11 +129,11 @@ def process_articles():
         prompt = f"""
 请按照以下标准模块构成改写文章，输出markdown格式：
 
-{standard_template}
+“”{standard_template}”“
 
 需要改写的文章：
 
-{content}
+“”{content}”“
 
 请按照上述标准模块构成，将文章改写成符合爆款文章结构的markdown格式。
 
