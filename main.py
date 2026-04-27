@@ -18,7 +18,7 @@ NEW_DIR = os.path.join(BASE_DIR, "new")
 PROCESS_SCRIPT = os.path.join(BASE_DIR, "process_articles.py")
 
 # Ollama API配置
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
+OLLAMA_API_URL = "http://192.168.2.111:11434/api/generate"
 
 def get_file_hash(file_path):
     """获取文件的MD5哈希值"""
