@@ -150,7 +150,7 @@ def main():
     log_message("=" * 60)
     log_message(f"监控目录: {NEW_DIR}")
     log_message(f"处理脚本: {PROCESS_SCRIPT}")
-    log_message(f"检查间隔: 600秒")
+    log_message(f"检查间隔: 3600秒")
     log_message(f"日志文件: {LOG_FILE}")
     log_message("=" * 60)
     
@@ -167,7 +167,7 @@ def main():
     
     while True:
         try:
-            time.sleep(600)
+            time.sleep(3600)
             
             current_files_info = scan_new_directory()
             
