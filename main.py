@@ -165,6 +165,13 @@ def main():
     last_files_info = scan_new_directory()
     log_message(f"当前文件数: {len(last_files_info)}")
     
+    if last_files_info:
+        log_message(f"启动时检测到目录中有文件 ({len(last_files_info)} 个)")
+        if check_ollama_service():
+            run_process_script()
+        else:
+            log_message("Ollama服务不可用，跳过启动时的处理")
+    
     while True:
         try:
             time.sleep(3600)
