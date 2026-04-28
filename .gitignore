@@ -1,7 +1,12 @@
-# Ignore directories with generated or temporary files
-old/
-output/
-new/
+# Ignore contents of runtime directories but keep the directories themselves
+old/*
+output/*
+new/*
+
+# But allow empty placeholder files in these directories (if needed)
+!old/.gitkeep
+!output/.gitkeep
+!new/.gitkeep
 
 # Ignore Python bytecode
 __pycache__/
