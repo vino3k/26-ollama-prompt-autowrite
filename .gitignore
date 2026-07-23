@@ -15,6 +15,14 @@ __pycache__/
 # Ignore log files
 *.log
 
+# Ignore environment files (contain API keys, do not commit)
+.env
+.env.local
+.env.*.local
+
+# Keep .env.example as a template for others
+!.env.example
+
 # Ignore IDE files
 .vscode/
 .idea/
