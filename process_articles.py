@@ -547,13 +547,23 @@ def process_articles():
         old_file_path = os.path.join(OLD_DIR, relative_path)
         old_dir = os.path.dirname(old_file_path)
         os.makedirs(old_dir, exist_ok=True)
-        
+
         # 如果文件已存在，先删除
         if os.path.exists(old_file_path):
             os.remove(old_file_path)
             print(f"删除了old目录中的旧文件: {relative_path}")
-        
-        shutil.move(file_path, old_file_path)
+
+        # 跨设备时 shutil.move 会失败（Docker 不同挂载点视为不同设备）
+        # 用 copy + remove 替代
+        try:
+            shutil.move(file_path, old_file_path)
+        except OSError as e:
+            if "跨设备" in str(e) or "Cross-device" in str(e) or e.errno == 18:
+                # 跨设备：先复制再删除
+                shutil.copy2(file_path, old_file_path)
+                os.remove(file_path)
+            else:
+                raise
         print(f"文件已从new目录移动到old目录: {relative_path}")
     
     print("\n所有文件处理完成！")

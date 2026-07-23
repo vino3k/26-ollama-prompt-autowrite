@@ -11,9 +11,10 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # ===== 系统依赖 =====
-# 仅安装必要的 curl（healthcheck 用），无需编译工具
+# 仅安装必要的 curl 和 gosu（gosu 用于 entrypoint 切换非 root 用户）
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
+        gosu \
         tzdata \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && rm -rf /var/lib/apt/lists/*
@@ -45,7 +46,10 @@ RUN chmod +x /entrypoint.sh
 # ===== 非 root 用户运行（安全） =====
 RUN useradd -m -u 1000 -s /bin/bash appuser \
     && chown -R appuser:appuser /app
-USER appuser
+
+# entrypoint 需要以 root 身份运行（用于 chown 挂载点权限、然后用 gosu 切到 appuser 启动应用）
+# 这样数据卷挂载点即使 owner 是 root，容器内也能正常写入
+USER root
 
 # ===== 启动入口 =====
 ENTRYPOINT ["/entrypoint.sh"]

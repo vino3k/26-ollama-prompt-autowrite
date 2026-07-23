@@ -24,7 +24,7 @@ echo "[entrypoint] LLM_PROVIDER=${LLM_PROVIDER:-ollama}"
 
 # ===== 等待 Ollama 服务（仅当使用本地 ollama 时） =====
 if [ "${LLM_PROVIDER:-ollama}" = "ollama" ]; then
-    OLLAMA_HOST=${OLLAMA_HOST:-host.docker.internal}
+    OLLAMA_HOST=${OLLAMA_HOST:-192.168.2.111}
     OLLAMA_PORT=${OLLAMA_PORT:-11434}
     OLLAMA_URL="http://${OLLAMA_HOST}:${OLLAMA_PORT}/api/tags"
 
@@ -42,5 +42,28 @@ if [ "${LLM_PROVIDER:-ollama}" = "ollama" ]; then
 fi
 
 # ===== 启动应用 =====
-echo "[entrypoint] 启动命令: $@"
-exec "$@"
+echo "[entrypoint] 启动命令: $*"
+if [ $# -eq 0 ]; then
+    echo "[entrypoint] WARN: 没有传入任何命令，容器将立即退出（docker-compose.yml 需要显式指定 command）"
+fi
+
+# ===== 修复数据卷权限（best-effort，失败不中断） =====
+# 宿主机挂载的目录 owner 可能是 root，但容器内以 appuser (uid 1000) 运行
+# 这里递归 chown 让 appuser 可写
+# 注意：容器内 chown 跨 mount 边界会失败，这里用 chmod 代替（更通用）
+echo "[entrypoint] 修复数据卷权限（用 chmod 兜底）..."
+chmod -R 777 /app/new /app/old /app/output /app/logs 2>/dev/null || true
+
+# ===== 如果以 root 启动，切到 appuser 跑应用 =====
+# 如果 chown 失败导致 appuser 写不进去，回退到 root 运行（牺牲一点安全性）
+if [ "$(id -u)" = "0" ]; then
+    echo "[entrypoint] 切换到 appuser 运行应用"
+    if command -v gosu >/dev/null 2>&1; then
+        exec gosu appuser "$@"
+    else
+        echo "[entrypoint] gosu 未安装，尝试 su -c"
+        exec su -s /bin/bash appuser -c "$*"
+    fi
+else
+    exec "$@"
+fi

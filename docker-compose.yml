@@ -6,6 +6,9 @@ services:
   26-ollama-prompt-autowrite:
     build: .
     container_name: 26-ollama-prompt-autowrite
+    # 显式指定启动命令：传入 entrypoint.sh 后会执行 python -u main.py
+    # 必须显式指定，否则 ENTRYPOINT 模式下 $@ 为空会导致容器立即退出并循环重启
+    command: ["python", "-u", "main.py"]
     networks:
       - biz-net
     volumes:
@@ -21,11 +24,13 @@ services:
       - ./.env:/app/.env:ro
     environment:
       - TZ=Asia/Shanghai
+      # 默认值：局域网 Ollama IP（与 .env 中保持一致）
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - OLLAMA_HOST=${OLLAMA_HOST:-host.docker.internal}
+      - OLLAMA_HOST=${OLLAMA_HOST:-192.168.2.111}
       - OLLAMA_PORT=${OLLAMA_PORT:-11434}
       - AGNES_API_KEY=${AGNES_API_KEY:-}
-    # 访问宿主机的 Ollama 服务（Linux 容器通过 host-gateway 支持 host.docker.internal）
+    # 兜底：让 host.docker.internal 解析为宿主机 IP（兼容 Docker Desktop 场景）
+    # 局域网部署以 OLLAMA_HOST=192.168.2.111 为主
     extra_hosts:
       - "host.docker.internal:host-gateway"
     deploy:
