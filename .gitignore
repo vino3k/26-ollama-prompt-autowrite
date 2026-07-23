@@ -3,10 +3,17 @@ old/*
 output/*
 new/*
 
+# Logs: ignore log files but keep directory + .gitkeep
+logs/*.log
+logs/*.lock
+logs/monitor.log
+logs/.monitor.lock
+
 # But allow empty placeholder files in these directories (if needed)
 !old/.gitkeep
 !output/.gitkeep
 !new/.gitkeep
+!logs/.gitkeep
 
 # Ignore Python bytecode
 __pycache__/
@@ -26,3 +33,10 @@ __pycache__/
 # Ignore IDE files
 .vscode/
 .idea/
+
+# Ignore Windows system diagnostic dumps
+dxdiag.txt
+*.dmp
+
+# Ignore Docker build artifacts
+docker-compose.override.yml

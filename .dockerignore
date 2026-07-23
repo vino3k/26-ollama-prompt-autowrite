@@ -1,0 +1,8 @@
+# Docker 部署相关
+.docker/
+docker-compose.override.yml
+
+# Dockerfile 临时构建文件（如果有）
+Dockerfile.local
+*.tar
+*.tar.gz

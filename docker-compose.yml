@@ -1,0 +1,78 @@
+# ============================================================================
+# 正式环境部署配置
+# ============================================================================
+# 用法：
+#   docker compose build           # 构建镜像
+#   docker compose up -d           # 后台启动
+#   docker compose logs -f         # 查看实时日志
+#   docker compose down            # 停止并删除容器
+# ============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 26-ollama-prompt-autowrite:latest
+    container_name: 26-ollama-prompt-autowrite
+
+    # ===== 启动命令：默认是监控，CRON=true 切换为一次性处理 =====
+    command: ["python", "-u", "main.py"]
+
+    # ===== 容器自动重启 =====
+    restart: unless-stopped
+
+    # ===== 时区 =====
+    environment:
+      - TZ=Asia/Shanghai
+      # LLM 提供方：ollama（默认）/ agnes
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      # Ollama 宿主机地址（Linux Docker 用 host.docker.internal 需开启
+      # 或在 extra_hosts 段已映射 host.docker.internal）
+      - OLLAMA_HOST=${OLLAMA_HOST:-host.docker.internal}
+      - OLLAMA_PORT=${OLLAMA_PORT:-11434}
+      # Agnes API Key（如果在 .env 中配则不需在此重复）
+      - AGNES_API_KEY=${AGNES_API_KEY:-}
+
+    # ===== Ollama 宿主机网络 =====
+    # Linux 容器访问宿主机服务的标准做法
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # ===== 数据卷：与宿主机双向同步 =====
+    volumes:
+      # 配置文件（API Key 等敏感信息）
+      - ./.env:/app/.env:ro
+      # 运行时数据：4 个目录映射到宿主机，容器内/外实时同步
+      - ./new:/app/new
+      - ./old:/app/old
+      - ./output:/app/output
+      # 日志和锁文件都放 logs 目录，统一管理
+      - ./logs:/app/logs
+
+    # ===== 健康检查 =====
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, sys; sys.exit(0 if os.path.exists('/app/main.py') else 1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # ===== 资源限制（可按需调整） =====
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # ===== 网络模式 =====
+    # 使用默认 bridge 网络；如需访问宿主 Ollama 必须配 extra_hosts
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge

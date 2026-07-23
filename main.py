@@ -15,12 +15,19 @@ from pathlib import Path
 # 目录路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NEW_DIR = os.path.join(BASE_DIR, "new")
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
 PROCESS_SCRIPT = os.path.join(BASE_DIR, "process_articles.py")
-LOG_FILE = os.path.join(BASE_DIR, "monitor.log")
-LOCK_FILE = os.path.join(BASE_DIR, ".monitor.lock")
+# 日志和锁文件统一放 logs 目录（与 docker-compose.yml 的挂载点保持一致）
+LOG_FILE = os.path.join(LOGS_DIR, "monitor.log")
+LOCK_FILE = os.path.join(LOGS_DIR, ".monitor.lock")
 
-# Ollama API配置
-OLLAMA_API_URL = "http://192.168.2.111:11434/api/generate"
+# Ollama API配置（支持环境变量覆盖，便于 Docker / 不同环境部署）
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "192.168.2.111")
+OLLAMA_PORT = os.environ.get("OLLAMA_PORT", "11434")
+OLLAMA_API_URL = os.environ.get(
+    "OLLAMA_API_URL",
+    f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/generate"
+)
 
 def log_message(message):
     """记录日志到文件和控制台"""
@@ -157,7 +164,11 @@ def main():
     if not os.path.exists(NEW_DIR):
         log_message(f"警告: 监控目录不存在，已创建: {NEW_DIR}")
         os.makedirs(NEW_DIR, exist_ok=True)
-    
+
+    # 确保 logs 目录存在（日志和锁文件目录）
+    if not os.path.exists(LOGS_DIR):
+        os.makedirs(LOGS_DIR, exist_ok=True)
+
     if not os.path.exists(PROCESS_SCRIPT):
         log_message(f"错误: 处理脚本不存在: {PROCESS_SCRIPT}")
         return
