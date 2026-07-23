@@ -53,9 +53,14 @@ CUSTOMER_SEGMENTS_FILE = os.path.join(BASE_DIR, "customer_segments.json")
 # 可通过环境变量 LLM_PROVIDER 覆盖，例如 set LLM_PROVIDER=agnes
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 
-# Ollama 配置
-OLLAMA_API_URL = "http://192.168.2.111:11434/api/generate"
-OLLAMA_MODEL = "qwen3.5:latest"
+# Ollama 配置（支持环境变量，便于 Docker / 不同环境部署）
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "192.168.2.111")
+OLLAMA_PORT = os.environ.get("OLLAMA_PORT", "11434")
+OLLAMA_API_URL = os.environ.get(
+    "OLLAMA_API_URL",
+    f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/generate"
+)
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:latest")
 
 # Agnes-2.0-Flash 配置（OpenAI 兼容 Chat Completions API）
 AGNES_API_URL = "https://apihub.agnes-ai.com/v1/chat/completions"

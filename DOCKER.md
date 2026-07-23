@@ -99,11 +99,15 @@ docker compose exec app bash
 
 | 容器内 | 宿主机 | 用途 |
 |---|---|---|
-| `/app/new` | `./new` | 待处理文件输入 |
-| `/app/old` | `./old` | 已处理文件备份 |
-| `/app/output` | `./output` | 改写后的 md 输出 |
-| `/app/logs` | `./logs` | 应用日志 |
+| `/app/new` | `./files/26-ollama-prompt-autowrite/00_new` | 待处理文件输入 |
+| `/app/old` | `./files/26-ollama-prompt-autowrite/01_old` | 已处理文件备份 |
+| `/app/output` | `./files/26-ollama-prompt-autowrite/02_output` | 改写后的 md 输出 |
+| `/app/logs` | `./logs/26-ollama-prompt-autowrite` | 应用日志和锁文件 |
 | `/app/.env` | `./.env` | 配置（**只读**挂载） |
+
+**数据卷命名规范**（与正式环境 `biz-net` 网络下的所有服务保持一致）：
+- `files/<服务名>/00_new/`、`01_old/`、`02_output/` — 业务数据
+- `logs/<服务名>/` — 日志和运行时文件
 
 **好处**：
 - 容器重建不丢失数据
@@ -129,9 +133,23 @@ extra_hosts:
 
 - **基础镜像**：`python:3.11-slim`（体积约 120MB）
 - **非 root 运行**：创建 `appuser` 用户运行应用
-- **健康检查**：自动检测容器健康状态
-- **自动重启**：`restart: unless-stopped` 策略
+- **自动重启**：`restart: always` 策略（与正式环境其他服务保持一致）
 - **时区**：`Asia/Shanghai`
+- **网络**：使用外部网络 `biz-net`（与正式环境 nginx/mysql/redis 等服务互通）
+
+### 4. 资源限制
+
+正式环境采用保守资源限制（防止单服务占用过多资源影响其他服务）：
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: "0.5"
+      memory: "1G"
+```
+
+如果业务量大，可在 docker-compose.yml 中调整。
 
 ---
 
@@ -198,6 +216,75 @@ docker compose build
 
 # 3. 重启容器
 docker compose up -d
+```
+
+---
+
+## 四、集成到正式环境
+
+你的正式环境采用统一的 docker-compose 编排，所有服务共享外部网络 `biz-net`。本服务的 `docker-compose.yml` 已经是正式环境风格：
+
+### 1. 与其他服务的关系
+
+- **网络**：使用与 nginx/mysql/redis/46todolist_wisdom 等服务相同的 `biz-net` 外部网络
+- **数据卷**：与 `16-dingtalk-daily-info` 一样的 `files/<服务名>/00_xxx`、`logs/<服务名>/` 规范
+- **重启策略**：`always`（与正式环境所有服务保持一致）
+- **资源限制**：保守 0.5 CPU / 1G 内存（参考 `46todolist_wisdom` 的 0.3/512M）
+
+### 2. 部署到正式环境
+
+假设正式环境 `biz-net` 已存在，部署步骤：
+
+```bash
+# 1. 进入项目目录
+cd /data/26-ollama-prompt-autowrite
+
+# 2. 准备数据卷目录
+mkdir -p files/26-ollama-prompt-autowrite/{00_new,01_old,02_output}
+mkdir -p logs/26-ollama-prompt-autowrite
+
+# 3. 准备 .env
+cp .env.example.docker .env
+vim .env   # 填入 AGNES_API_KEY 等
+
+# 4. 启动（注意：因使用外部网络，需先确保 biz-net 已存在）
+docker compose up -d
+
+# 5. 验证
+docker compose ps
+docker compose logs --tail=50
+```
+
+### 3. 与正式环境其他服务共存
+
+如果 `biz-net` 网络是某个父级 docker-compose 创建的，子服务需要使用 `external: true`：
+
+```yaml
+# 本服务 docker-compose.yml 已正确配置
+networks:
+  biz-net:
+    external: true
+```
+
+这样你**不需要**修改父级 docker-compose，只需在项目目录下 `docker compose up -d` 即可加入 `biz-net`。
+
+### 4. 数据卷目录说明
+
+正式环境下数据卷结构：
+
+```
+/data/26-ollama-prompt-autowrite/
+├── docker-compose.yml
+├── .env
+├── files/
+│   └── 26-ollama-prompt-autowrite/
+│       ├── 00_new/        # 待处理文章
+│       ├── 01_old/        # 已处理原文
+│       └── 02_output/     # 改写输出
+└── logs/
+    └── 26-ollama-prompt-autowrite/
+        ├── monitor.log
+        └── .monitor.lock
 ```
 
 ---
