@@ -62,7 +62,7 @@
 | `model` | string | `agnes-2.0-flash` | Agnes 模型 ID |
 | `max_tokens` | int | 4096 | `max_tokens` 参数上限 |
 | `temperature` | float | 0.7 | 采样温度（0~1） |
-| `thinking` | bool | `true` | 是否启用 Think 模式（`chat_template_kwargs.enable_thinking`） |
+| `thinking` | bool | `false` | 是否启用 Think 模式（经测试 Agnes-2.0-Flash 不支持有效 thinking，建议保持 false） |
 | `request_timeout_seconds` | int | 300 | 单次 LLM 请求超时（秒） |
 
 ### 3.4 llm.retry（重试与内容校验）
@@ -94,8 +94,8 @@
 | `role` | string | `你是一位资深知识产权内容策略师...` | LLM 的角色定义，作为 Prompt 的首段，同时也是 Agnes 的 System Prompt |
 | `company_background` | string | `知识产权综合代理机构...` | Prompt 中"公司背景"段落 |
 | `standard_template_ref` | string | `standard-template.txt` | 引用的标准模板文件名；代码会**读取该文件的实际内容**嵌入 Prompt |
-| `style_rules` | list[str] | 见 config.json | Prompt 的完整风格规则集（含结构要求/内容要求/禁止事项），条目按顺序用 `\n- ` 连接进入 Prompt |
-| `required_sections_after_body` | list[str] | 固定 2 条 | 对"文末固定模块"的详细要求（【可转发理由】/【留言互动】），会完整嵌入 Prompt |
+| `style_rules` | list[str] | 见 config.json | Prompt 的完整规则集（含结构要求/内容要求/严禁输出标记/禁止事项），条目按顺序用 `\n- ` 连接进入 Prompt |
+| `required_sections_after_body` | list[str] | 固定 2 条 | 对"文末固定模块"的说明（用自然方式表达，不要【】标记），会嵌入 Prompt |
 | `task_template` | string | 带占位符模板 | 主 Prompt 模板。占位符：`{role}`、`{standard_template}`（文件内容）、`{segment_info}`、`{source}`、`{company_background}`、`{style_rules_block}`、`{required_sections_block}` |
 
 > **修改此段前请充分评估**：改动会直接影响 LLM 输出质量。建议做 A/B 测试再上线。
