@@ -25,7 +25,7 @@
 ├── config.json          # ★ 集中配置，所有业务固定值的唯一起点
 ├── config.readme.md     # ★ config.json 的强制配套文档
 ├── customer_segments.json  # 客户群体识别规则（非敏感）
-├── standard-template.txt   # 改写结构模板（非敏感）
+├── standard-template.md   # 改写结构模板（非敏感）
 ├── VERSION.txt
 ├── CHANGELOG.md
 ├── .env                 # 敏感值（必须 .gitignore）

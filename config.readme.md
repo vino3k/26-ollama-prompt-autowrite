@@ -93,7 +93,7 @@
 |------|------|--------|------|
 | `role` | string | `你是一位资深知识产权内容策略师...` | LLM 的角色定义，作为 Prompt 的首段，同时也是 Agnes 的 System Prompt |
 | `company_background` | string | `知识产权综合代理机构...` | Prompt 中"公司背景"段落 |
-| `standard_template_ref` | string | `standard-template.txt` | 引用的标准模板文件名；代码会**读取该文件的实际内容**嵌入 Prompt |
+| `standard_template_ref` | string | `standard-template.md` | 引用的标准模板文件名；代码会**读取该文件的实际内容**嵌入 Prompt |
 | `style_rules` | list[str] | 见 config.json | Prompt 的完整规则集（含结构要求/内容要求/严禁输出标记/禁止事项），条目按顺序用 `\n- ` 连接进入 Prompt |
 | `required_sections_after_body` | list[str] | 固定 2 条 | 对"文末固定模块"的说明（用自然方式表达，不要【】标记），会嵌入 Prompt |
 | `task_template` | string | 带占位符模板 | 主 Prompt 模板。占位符：`{role}`、`{standard_template}`（文件内容）、`{segment_info}`、`{source}`、`{company_background}`、`{style_rules_block}`、`{required_sections_block}` |
@@ -108,7 +108,7 @@
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `config_file` | string | `customer_segments.json` | 客户群体识别规则文件名，与 `process_articles.py` 中 `CUSTOMER_SEGMENTS_FILE` 对应 |
-| `template_file` | string | `standard-template.txt` | 改写结构模板文件名，与 `process_articles.py` 中 `STANDARD_FILE` 对应 |
+| `template_file` | string | `standard-template.md` | 改写结构模板文件名，与 `process_articles.py` 中 `STANDARD_FILE` 对应 |
 | `allowed_file_exts` | list[str] | `[".md", ".json"]` | 应用允许处理的源文件后缀，跨模块边界校验用 |
 | `tag_preview_limit` | int | 10 | YAML frontmatter 中标签预览数量上限 |
 

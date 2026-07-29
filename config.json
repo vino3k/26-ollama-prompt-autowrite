@@ -62,13 +62,13 @@
   "prompt": {
     "role": "你是一位资深知识产权内容策略师，擅长将专业内容改写成符合移动端阅读习惯、具有传播力的爆款文章。",
     "company_background": "知识产权综合代理机构，主营业务：商标代理、专利申请、版权登记、体系认证、科创项目申报、海外知识产权布局。",
-    "standard_template_ref": "standard-template.txt",
+    "standard_template_ref": "standard-template.md",
     "style_rules": [
       "【结构要求】",
       "使用 SCQA 模型（情境→冲突→问题→答案）构建引人入胜的开篇",
       "正文采用金字塔结构，结论先行，逐层展开论据",
       "使用多级小标题、加粗重点、emoji 点缀，适配移动端阅读",
-      "参考 standard-template.txt 的写作手法和结构逻辑，但不要输出模板中的说明文字",
+      "参考 standard-template.md 的写作手法和结构逻辑，但不要输出模板中的说明文字",
       "紧扣客户群体的痛点、收益、互动钩子进行改写",
       "",
       "【内容要求】",
@@ -116,7 +116,7 @@
 
   "security": {
     "config_file": "customer_segments.json",
-    "template_file": "standard-template.txt",
+    "template_file": "standard-template.md",
     "allowed_file_exts": [".md", ".json"],
     "tag_preview_limit": 10
   }

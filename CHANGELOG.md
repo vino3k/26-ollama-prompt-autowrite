@@ -8,6 +8,18 @@
 
 ---
 
+## [1.1.9] - 2026-07-29
+
+### 文件重命名
+- 将 `standard-template.txt` 重命名为 `standard-template.md`
+- 更新所有代码和配置中的文件引用：
+  - config.json: standard_template_ref, template_file
+  - process_articles.py: STANDARD_FILE 默认值和注释
+  - Dockerfile: COPY 指令
+  - AGENTS.md, config.readme.md, DOCKER.md: 文档引用
+
+---
+
 ## [1.1.8] - 2026-07-29
 
 ### Prompt 优化

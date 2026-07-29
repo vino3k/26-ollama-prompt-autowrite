@@ -65,7 +65,7 @@ def cfg_get(*keys, default=None):
 NEW_DIR = os.path.join(BASE_DIR, "new")
 OLD_DIR = os.path.join(BASE_DIR, "old")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-STANDARD_FILE = os.path.join(BASE_DIR, cfg_get("security", "template_file", default="standard-template.txt"))
+STANDARD_FILE = os.path.join(BASE_DIR, cfg_get("security", "template_file", default="standard-template.md"))
 CUSTOMER_SEGMENTS_FILE = os.path.join(BASE_DIR, cfg_get("security", "config_file", default="customer_segments.json"))
 
 
@@ -321,10 +321,10 @@ def build_prompt(segment_info_str, content, title_prefix_hint, min_benefit_hits)
     company_background = prompt_cfg.get("company_background", "")
     required_sections_list = prompt_cfg.get("required_sections_after_body", [])
 
-    # 加载 standard-template.txt 的实际内容
+    # 加载 standard-template.md 的实际内容
     standard_template_content = load_standard_template()
     if not standard_template_content:
-        standard_template_content = "(标准模板文件加载失败，请检查 standard-template.txt)"
+        standard_template_content = "(标准模板文件加载失败，请检查 standard-template.md)"
 
     # 将 title_prefix 作为一条运行时规则附加到 style_rules
     style_rules_with_dynamic = style_rules_list + [

@@ -441,7 +441,7 @@ docker container prune
 ├── main.py                          # 监控脚本
 ├── process_articles.py              # 处理脚本
 ├── customer_segments.json           # 客户群体配置
-├── standard-template.txt            # 改写模板
+├── standard-template.md            # 改写模板
 ├── new/                             # 待处理文件（挂载）
 │   └── 01_first_level/
 ├── old/                             # 已处理文件（挂载）
