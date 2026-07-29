@@ -96,7 +96,7 @@ OLLAMA_TIMEOUT = ollama_cfg.get("request_timeout_seconds", 300)
 # Agnes
 agnes_cfg = cfg_get("llm", "agnes", default={})
 AGNES_API_KEY = os.environ.get(agnes_cfg.get("api_key_env", "AGNES_API_KEY"), "")
-AGNES_API_URL = agnes_cfg.get("api_url", "https://apihub.agnes-ai.com/v1/chat/completions")
+AGNES_API_URL = agnes_cfg.get("api_url", "https://apihub.agnes-ai.cn/v1/chat/completions")
 AGNES_MODEL = agnes_cfg.get("model", "agnes-2.0-flash")
 AGNES_MAX_TOKENS = agnes_cfg.get("max_tokens", 4096)
 AGNES_TEMPERATURE = agnes_cfg.get("temperature", 0.7)

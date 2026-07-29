@@ -58,7 +58,7 @@
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `api_key_env` | string | `AGNES_API_KEY` | Agnes API Key **环境变量名**。真实 Key 必须仅出现在 `.env` 或系统环境变量中 |
-| `api_url` | string | `https://apihub.agnes-ai.com/v1/chat/completions` | Agnes Chat Completions 接口地址 |
+| `api_url` | string | `https://apihub.agnes-ai.cn/v1/chat/completions` | Agnes Chat Completions 接口地址 |
 | `model` | string | `agnes-2.0-flash` | Agnes 模型 ID |
 | `max_tokens` | int | 4096 | `max_tokens` 参数上限 |
 | `temperature` | float | 0.7 | 采样温度（0~1） |

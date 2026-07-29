@@ -39,7 +39,7 @@ vim .env
 | `LLM_PROVIDER` | 是 | `ollama`（默认，访问宿主 Ollama） / `agnes`（云端 API） |
 | `OLLAMA_HOST` | 仅 ollama | Docker 容器内访问宿主机 Ollama 的地址，一般用 `host.docker.internal` |
 | `OLLAMA_PORT` | 仅 ollama | Ollama 端口，默认 `11434` |
-| `AGNES_API_KEY` | 仅 agnes | 在 https://apihub.agnes-ai.com/ 申请的 API Key |
+| `AGNES_API_KEY` | 仅 agnes | 在 https://apihub.agnes-ai.cn/ 申请的 API Key |
 
 ---
 

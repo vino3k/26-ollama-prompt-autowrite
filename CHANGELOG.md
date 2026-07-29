@@ -8,6 +8,16 @@
 
 ---
 
+## [1.1.3] - 2026-07-29
+
+### Bug 修复
+- 将 Agnes API 域名从 `apihub.agnes-ai.com` 更新为 `apihub.agnes-ai.cn`（覆盖 6 个文件：config.json、process_articles.py、.env.example、.env.example.docker、DOCKER.md、config.readme.md）
+
+### 不兼容变更
+- 无（仅域名替换，路径与参数完全一致）
+
+---
+
 ## [1.1.2] - 2026-07-29
 
 ### Bug 修复
