@@ -8,6 +8,19 @@
 
 ---
 
+## [1.1.4] - 2026-07-29
+
+### 功能优化
+- 新增 `.env` 配置文件，默认启用 Agnes 云端模型（`LLM_PROVIDER=agnes`）
+- 修改 `entrypoint.sh` 默认 LLM_PROVIDER 从 `ollama` 改为 `agnes`
+- 修改 `docker-compose.yml` 默认 LLM_PROVIDER 从 `ollama` 改为 `agnes`
+
+### 影响
+- 容器启动时不再等待本地 Ollama 服务，直接调用 Agnes API
+- 用户可通过修改 `.env` 中的 `LLM_PROVIDER=ollama` 切换回本地模型
+
+---
+
 ## [1.1.3] - 2026-07-29
 
 ### Bug 修复

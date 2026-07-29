@@ -25,7 +25,7 @@ services:
     environment:
       - TZ=Asia/Shanghai
       # 默认值：局域网 Ollama IP（与 .env 中保持一致）
-      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_PROVIDER=${LLM_PROVIDER:-agnes}
       - OLLAMA_HOST=${OLLAMA_HOST:-192.168.2.111}
       - OLLAMA_PORT=${OLLAMA_PORT:-11434}
       - AGNES_API_KEY=${AGNES_API_KEY:-}
