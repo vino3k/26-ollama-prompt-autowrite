@@ -254,13 +254,42 @@ def call_agnes_api(prompt, system_prompt=None):
         print(f"Prompt 长度: {len(prompt)} 字符")
         response = requests.post(AGNES_API_URL, headers=headers, json=data, timeout=AGNES_TIMEOUT)
         print(f"API 响应状态码: {response.status_code}")
+        
+        # 打印完整响应用于调试
+        try:
+            result = response.json()
+            print(f"响应 JSON keys: {list(result.keys())}")
+            if "choices" in result:
+                choice = result["choices"][0]
+                print(f"choice keys: {list(choice.keys())}")
+                if "message" in choice:
+                    print(f"message keys: {list(choice['message'].keys())}")
+        except:
+            print(f"响应原文(前500字符): {response.text[:500]}")
+        
         response.raise_for_status()
         result = response.json()
         choices = result.get("choices", [])
         if not choices:
             print("警告: API 返回空的 choices")
             return None
-        response_text = choices[0].get("message", {}).get("content", "")
+        
+        # 处理 thinking 模式：先尝试 reasoning_content，再尝试 content
+        message = choices[0].get("message", {})
+        
+        # 优先取 reasoning_content（thinking 模式下的实际内容）
+        response_text = message.get("reasoning_content", "")
+        if not response_text:
+            response_text = message.get("content", "")
+        
+        # 如果 content 是数组（某些 API 格式），取文本内容
+        if isinstance(response_text, list):
+            text_parts = []
+            for item in response_text:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_parts.append(item.get("text", ""))
+            response_text = "".join(text_parts)
+        
         print(f"生成内容长度: {len(response_text)} 字符")
         return response_text if response_text and response_text.strip() else None
     except requests.exceptions.ConnectionError as e:

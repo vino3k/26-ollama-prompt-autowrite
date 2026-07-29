@@ -8,6 +8,17 @@
 
 ---
 
+## [1.1.6] - 2026-07-29
+
+### Bug 修复
+- **严重**：修复 Agnes API 开启 thinking 模式后返回 200 但内容为空的问题。原因是 `thinking=true` 时响应结构不同，实际内容在 `reasoning_content` 而非 `content` 字段
+
+### 优化
+- 增加响应解析的兼容性：优先取 `reasoning_content`，fallback 到 `content`，支持数组格式的 content
+- 增加调试日志：打印响应 JSON 的 keys 结构，方便排查问题
+
+---
+
 ## [1.1.5] - 2026-07-29
 
 ### Bug 修复
