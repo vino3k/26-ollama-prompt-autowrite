@@ -59,6 +59,12 @@ OLLAMA_API_URL = os.environ.get(
 )
 HEALTH_CHECK_TIMEOUT = cfg_get("llm", "ollama", "health_check_timeout_seconds", default=10)
 
+# LLM 提供方判断（agres 模式下不需要检查 Ollama）
+LLM_PROVIDER = os.environ.get(
+    cfg_get("llm", "provider_env", default="LLM_PROVIDER"),
+    "ollama"
+).lower()
+
 
 def log_message(message):
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
@@ -95,6 +101,9 @@ def scan_new_directory():
 
 
 def check_ollama_service():
+    """检查 Ollama 服务是否可用。使用 agres 时直接跳过。"""
+    if LLM_PROVIDER != "ollama":
+        return True
     try:
         base_url = OLLAMA_API_URL.split('/api/')[0]
         response = requests.get(f"{base_url}/api/tags", timeout=HEALTH_CHECK_TIMEOUT)
@@ -167,7 +176,7 @@ def run_process_script():
 
 def main():
     log_message("=" * 60)
-    log_message("Ollama 文章处理监控系统启动")
+    log_message(f"文章处理监控系统启动 (LLM: {LLM_PROVIDER})")
     log_message("=" * 60)
     log_message(f"监控目录: {NEW_DIR}")
     log_message(f"处理脚本: {PROCESS_SCRIPT}")
@@ -196,7 +205,7 @@ def main():
         if check_ollama_service():
             run_process_script()
         else:
-            log_message("Ollama 服务不可用，跳过启动时的处理")
+            log_message("LLM 服务不可用，跳过启动时的处理")
 
     while True:
         try:
@@ -207,7 +216,7 @@ def main():
                 if check_ollama_service():
                     run_process_script()
                 else:
-                    log_message("Ollama 服务不可用，跳过本次处理")
+                    log_message("LLM 服务不可用，跳过本次处理")
             else:
                 log_message("目录中无文件")
         except KeyboardInterrupt:
