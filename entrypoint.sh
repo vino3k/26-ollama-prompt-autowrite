@@ -23,9 +23,13 @@ fi
 echo "[entrypoint] LLM_PROVIDER=${LLM_PROVIDER:-ollama}"
 
 # ===== 等待 Ollama 服务（仅当使用本地 ollama 时） =====
+# 注意：此处硬编码默认值必须与 config.json 的 defaults 同步！
+# - OLLAMA_HOST 默认值 ↔ config.llm.ollama.host_default（当前为 192.168.2.111）
+# - OLLAMA_PORT 默认值 ↔ config.llm.ollama.port_default（当前为 11434）
+# 实际部署时应通过 .env 或环境变量覆盖这两个值
 if [ "${LLM_PROVIDER:-ollama}" = "ollama" ]; then
-    OLLAMA_HOST=${OLLAMA_HOST:-192.168.2.111}
-    OLLAMA_PORT=${OLLAMA_PORT:-11434}
+    OLLAMA_HOST=${OLLAMA_HOST:-192.168.2.111}  # TODO: 与 config.json 保持同步
+    OLLAMA_PORT=${OLLAMA_PORT:-11434}          # TODO: 与 config.json 保持同步
     OLLAMA_URL="http://${OLLAMA_HOST}:${OLLAMA_PORT}/api/tags"
 
     echo "[entrypoint] 等待 Ollama 服务就绪: ${OLLAMA_URL}"

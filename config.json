@@ -1,0 +1,112 @@
+{
+  "_comment": "应用配置文件。所有可配置常量、业务参数统一在本文件维护，业务代码通过 load_config() 加载。涉及敏感值（真实 API Key 等）一律走环境变量，config.json 仅保留占位或默认值。",
+  "version": "1.1.2",
+
+  "monitor": {
+    "scan_interval_seconds": 3600,
+    "lock_max_age_seconds": 3600,
+    "process_timeout_seconds": 3600,
+    "recover_wait_seconds": 60,
+    "process_file_exts": [".md", ".json"],
+    "required_dirs": ["new", "old", "output", "logs"]
+  },
+
+  "llm": {
+    "provider_env": "LLM_PROVIDER",
+    "ollama": {
+      "host_env": "OLLAMA_HOST",
+      "port_env": "OLLAMA_PORT",
+      "host_default": "192.168.2.111",
+      "port_default": 11434,
+      "model_env": "OLLAMA_MODEL",
+      "model_default": "qwen3.5:latest",
+      "api_url_env": "OLLAMA_API_URL",
+      "request_timeout_seconds": 300,
+      "health_check_timeout_seconds": 10
+    },
+    "agnes": {
+      "api_key_env": "AGNES_API_KEY",
+      "api_url": "https://apihub.agnes-ai.com/v1/chat/completions",
+      "model": "agnes-2.0-flash",
+      "max_tokens": 4096,
+      "temperature": 0.7,
+      "thinking": true,
+      "request_timeout_seconds": 300
+    },
+    "retry": {
+      "max_attempts": 2,
+      "min_benefit_hits": 3,
+      "default_system_prompt": "你是一位资深知识产权内容策略师，擅长将专业内容改写成符合移动端阅读习惯、具有传播力的爆款文章。"
+    }
+  },
+
+  "content": {
+    "benefit_keywords": [
+      "省钱", "省下", "节省", "少花", "多拿", "拿到补贴", "领补贴", "拿补贴", "扶持资金", "政府补贴",
+      "减免", "减税", "退税", "加计扣除", "返还",
+      "防罚款", "避免罚款", "避免赔偿", "避免损失", "规避风险", "避免下架", "避免封号",
+      "拓市场", "开拓市场", "出海", "上亚马逊", "入驻平台", "上新品", "扩品类",
+      "拿证", "下证", "授权", "备案", "认定通过", "申报成功", "维权成功", "拿到订单",
+      "拿政策", "享受政策", "政策红利", "享受福利", "高企", "高新企业", "专精特新",
+      "成本", "官费", "补助", "奖励"
+    ],
+    "required_title_prefix": [
+      "必须在正文标题前加入客户群体专属小标题前缀（如【电商商标指南】【工厂专利申报】），让读者一眼识别行业归属。"
+    ],
+    "required_sections_after_body": [
+      "【可转发理由】：一段明确告诉读者'为什么应该把这篇文章转发给谁'的话，让读者有明确的转发对象和转发动机，例如提醒合伙人/运营负责人提前规避踩坑、省下数万元赔偿",
+      "【留言互动】：1 个具体问题向读者提问，问题必须紧扣客户群体痛点，不能使用\"你认同第几点\"这类通用提问"
+    ]
+  },
+
+  "prompt": {
+    "role": "你是一位资深知识产权内容策略师，擅长将专业内容改写成符合移动端阅读习惯、具有传播力的爆款文章。",
+    "company_background": "知识产权综合代理机构，主营业务：商标代理、专利申请、版权登记、体系认证、科创项目申报、海外知识产权布局。",
+    "standard_template_ref": "standard-template.txt",
+    "style_rules": [
+      "【结构要求】",
+      "使用 SCQA 模型（情境→冲突→问题→答案）构建引人入胜的开篇",
+      "正文采用金字塔结构，结论先行，逐层展开论据",
+      "使用多级小标题、加粗重点、emoji 点缀，适配移动端阅读",
+      "严格遵循 standard-template.txt 的标准模块结构",
+      "紧扣客户群体的痛点、收益、互动钩子进行改写",
+      "",
+      "【内容要求】",
+      "保持原文核心信息不变，不增删关键事实",
+      "将知识产权业务（商标/专利/版权/认证/科创/海外）自然融入内容场景",
+      "引用外部信息时必须标注来源",
+      "语言风格：专业且有温度，避免生硬说教",
+      "文章首行标题必须以客户群体专属小标题前缀开头",
+      "文中必须明确给出至少 3 条客户可感知实际利益：",
+      "  - 省钱型（少花官费、节省开支、降低侵权赔偿）",
+      "  - 拿补贴型（政府补贴、扶持资金、税收减免、加计扣除、高新企业减免所得税）",
+      "  - 防罚款/防风险型（避免下架、避免封号、避免赔偿、避免驳回）",
+      "  - 拓市场型（出海、入驻平台、扩品类、拿下订单）",
+      "  - 拿证/维权型（下证、备案、认定通过、维权成功）",
+      "  每条利益必须具体、可量化、有场景",
+      "文末必须包含 2 个固定模块：",
+      "  - 【可转发理由】：明确告诉读者为什么应该把这篇文章转发给谁",
+      "  - 【留言互动】：1 个具体问题，必须紧扣客户群体痛点",
+      "",
+      "【禁止事项】",
+      "出现任何机构标识、版权声明、年份信息",
+      "使用\"国家安全警示中心\"等类似机构名称",
+      "任何可能被解读为冒充国家机构的表述",
+      "AI 说明性文字（如\"作为 AI 助手\"）、流水账叙述、代码或字符串",
+      "正文中出现\"框架\"\"模型\"\"结构\"等元描述词汇",
+      "正文中出现\"S - 情境、C - 冲突、Q - 问题、A - 答案\"等词汇"
+    ],
+    "required_sections_after_body": [
+      "【可转发理由】：一段明确告诉读者'为什么应该把这篇文章转发给谁'的话，让读者有明确的转发对象和转发动机，例如提醒合伙人/运营负责人提前规避踩坑、省下数万元赔偿",
+      "【留言互动】：1 个具体问题向读者提问，问题必须紧扣客户群体痛点，不能使用\"你认同第几点\"这类通用提问"
+    ],
+    "task_template": "{role}\n\n## 任务\n将以下文章按照标准模块结构改写，融入知识产权代理业务场景，输出完整 Markdown 格式。\n\n## 标准模块结构\n{standard_template}\n\n## 目标客户群体\n{segment_info}\n\n## 待改写内容\n\"\"{source}\"\"\n\n## 公司背景\n{company_background}\n\n## 内容规范\n{style_rules_block}\n\n## 文末固定模块（必须包含）\n{required_sections_block}\n\n## 输出\n仅输出改写后的 Markdown 正文，不要添加任何前言、后记或解释说明。"
+  },
+
+  "security": {
+    "config_file": "customer_segments.json",
+    "template_file": "standard-template.txt",
+    "allowed_file_exts": [".md", ".json"],
+    "tag_preview_limit": 10
+  }
+}

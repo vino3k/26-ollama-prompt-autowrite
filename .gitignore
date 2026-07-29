@@ -26,9 +26,26 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+.env.test
 
 # Keep .env.example as a template for others
 !.env.example
+!.env.example.docker
+
+# Ignore keys & certificates (do not commit secrets)
+*.pem
+*.key
+*.crt
+*.pfx
+id_rsa
+id_rsa.pub
+
+# Ignore local private configs
+*local.config.json
+config.local.yaml
+settings.local.yml
 
 # Ignore IDE files
 .vscode/

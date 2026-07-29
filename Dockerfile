@@ -29,10 +29,12 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ===== 复制应用代码 =====
-COPY main.py            ./
-COPY process_articles.py ./
-COPY customer_segments.json ./
-COPY standard-template.txt ./
+COPY main.py                 ./
+COPY process_articles.py     ./
+COPY config.json             ./
+COPY config.readme.md        ./
+COPY customer_segments.json  ./
+COPY standard-template.txt   ./
 
 # ===== 运行时目录 =====
 # 这些目录是数据卷挂载点，容器启动时会被宿主机目录覆盖
