@@ -274,14 +274,13 @@ def call_agnes_api(prompt, system_prompt=None):
             print("警告: API 返回空的 choices")
             return None
         
-        # 处理 thinking 模式：先尝试 reasoning_content，再尝试 content
+        # 处理思考/输出分离：优先取 content（最终输出），仅在 content 为空时考虑 reasoning_content
+        # 注意：Agnes API 即使关闭 thinking，也会返回 reasoning_content（包含思考过程），必须忽略
         message = choices[0].get("message", {})
-        
-        # 优先取 reasoning_content（thinking 模式下的实际内容）
-        response_text = message.get("reasoning_content", "")
-        if not response_text:
-            response_text = message.get("content", "")
-        
+
+        # 优先取 content（最终输出的文章正文）
+        response_text = message.get("content", "")
+
         # 如果 content 是数组（某些 API 格式），取文本内容
         if isinstance(response_text, list):
             text_parts = []
@@ -289,7 +288,14 @@ def call_agnes_api(prompt, system_prompt=None):
                 if isinstance(item, dict) and item.get("type") == "text":
                     text_parts.append(item.get("text", ""))
             response_text = "".join(text_parts)
-        
+
+        # 如果 content 存在但为空，警告并尝试 reasoning_content（兜底）
+        if not response_text or not response_text.strip():
+            reasoning = message.get("reasoning_content", "")
+            if reasoning and reasoning.strip():
+                print(f"警告: content 为空，fallback 到 reasoning_content（{len(reasoning)}字符），可能是思考过程而非正文")
+                response_text = reasoning
+
         print(f"生成内容长度: {len(response_text)} 字符")
         return response_text if response_text and response_text.strip() else None
     except requests.exceptions.ConnectionError as e:
