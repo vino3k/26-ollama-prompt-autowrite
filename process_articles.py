@@ -157,6 +157,34 @@ def identify_customer_segment(content, customer_segments):
     return best_id, customer_segments[best_id]
 
 
+def load_templates():
+    """从 config.json 加载多模板列表；未配置时返回空列表（回退旧单模板逻辑）。"""
+    return cfg_get("templates", "list", default=[])
+
+
+def match_template(content, templates):
+    """根据内容关键词打分匹配最合适的改写模板。
+    命中 priority_keywords 计 2 分，命中 match_keywords 计 1 分；
+    同分时按 match_priority（越小越优先）决胜；全部未命中时回退 default_template。
+    """
+    if not templates:
+        return None
+    scored = []
+    for tpl in templates:
+        score = sum(2 for kw in tpl.get("priority_keywords", []) if kw and kw in content)
+        score += sum(1 for kw in tpl.get("match_keywords", []) if kw and kw in content)
+        scored.append((score, tpl.get("match_priority", 99), tpl))
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    best_score = scored[0][0]
+    if best_score <= 0:
+        default_id = cfg_get("templates", "default_template", default=None)
+        for tpl in templates:
+            if tpl.get("id") == default_id:
+                return tpl
+        return scored[0][2]
+    return scored[0][2]
+
+
 def count_benefit_hits(content):
     if not content:
         return 0
@@ -175,15 +203,17 @@ def apply_title_prefix(content, prefix):
     return '\n'.join(lines)
 
 
-def build_frontmatter(segment_id, seg, title):
-    if not seg:
-        return ""
-    tags = seg.get("tags", [])
-    label = seg.get("label", "通用")
+def build_frontmatter(segment_id, seg, title, template_id=None, template_name=None):
+    tags = seg.get("tags", []) if seg else []
+    label = seg.get("label", "通用") if seg else "通用"
     lines = ["---"]
     lines.append(f'title: "{title.replace(chr(34), chr(92) + chr(34))}"')
     lines.append(f'customer_segment: "{segment_id or "general"}"')
     lines.append(f'customer_label: "{label}"')
+    if template_id:
+        lines.append(f'template: "{template_id}"')
+    if template_name:
+        lines.append(f'template_name: "{template_name}"')
     if tags:
         lines.append('tags:')
         for t in tags:
@@ -318,39 +348,53 @@ def call_llm_api(prompt, system_prompt=None):
     return call_ollama_api(prompt)
 
 
-def build_prompt(segment_info_str, content, title_prefix_hint, min_benefit_hits):
-    """按照 config.prompt 的模板拼接 Prompt。"""
-    prompt_cfg = cfg_get("prompt", default={})
-    task_template = prompt_cfg.get("task_template", "")
-    role = prompt_cfg.get("role", "")
-    style_rules_list = prompt_cfg.get("style_rules", [])
-    company_background = prompt_cfg.get("company_background", "")
-    required_sections_list = prompt_cfg.get("required_sections_after_body", [])
+def build_prompt(template, segment_info_str, content, title_prefix_hint, min_benefit_hits):
+    """按照匹配到的模板拼接 Prompt；template 为空时回退旧 config.prompt 单模板逻辑。"""
+    if template:
+        task_template = template.get("task_template", "")
+        role = template.get("role", "")
+        style_rules_list = template.get("style_rules", [])
+        company_background = template.get("company_background", "")
+        required_sections_list = template.get("required_sections_after_body", [])
+    else:
+        prompt_cfg = cfg_get("prompt", default={})
+        task_template = prompt_cfg.get("task_template", "")
+        role = prompt_cfg.get("role", "")
+        style_rules_list = prompt_cfg.get("style_rules", [])
+        company_background = prompt_cfg.get("company_background", "")
+        required_sections_list = prompt_cfg.get("required_sections_after_body", [])
 
-    # 加载 standard-template.md 的实际内容
-    standard_template_content = load_standard_template()
-    if not standard_template_content:
-        standard_template_content = "(标准模板文件加载失败，请检查 standard-template.md)"
-
-    # 将 title_prefix 作为一条运行时规则附加到 style_rules
-    style_rules_with_dynamic = style_rules_list + [
+    # 将 title_prefix / 最低利益条数作为运行时规则附加到 style_rules；
+    # 多模板无 {segment_info} 占位符，客户画像一并注入 style_rules
+    dynamic_rules = [
         "",
         f"【动态要求】文章标题必须以 '{title_prefix_hint}' 开头；内容中必须包含至少 {min_benefit_hits} 条具体、可量化的客户可感知实际利益。"
     ]
+    if template and segment_info_str:
+        dynamic_rules.append("")
+        dynamic_rules.append(f"【目标客户画像】\n{segment_info_str}")
+    style_rules_with_dynamic = style_rules_list + dynamic_rules
     style_rules_block = "\n".join(f"- {r}" if r else "" for r in style_rules_with_dynamic)
 
     # 生成 required_sections_block
     required_sections_block = "\n".join(f"- {r}" for r in required_sections_list)
 
-    return task_template.format(
+    kwargs = dict(
         role=role,
-        standard_template=standard_template_content,
-        segment_info=segment_info_str,
         source=content,
         style_rules_block=style_rules_block,
         company_background=company_background,
         required_sections_block=required_sections_block,
     )
+    if not template:
+        # 旧单模板兼容：注入 standard-template 实际内容与 segment_info 占位符
+        standard_template_content = load_standard_template()
+        if not standard_template_content:
+            standard_template_content = "(标准模板文件加载失败，请检查 standard-template.md)"
+        kwargs["standard_template"] = standard_template_content
+        kwargs["segment_info"] = segment_info_str
+
+    return task_template.format(**kwargs)
 
 
 def process_articles():
@@ -358,6 +402,11 @@ def process_articles():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     customer_segments = load_customer_segments()
+    templates = load_templates()
+    if templates:
+        print(f"已加载 {len(templates)} 个改写模板: {[t.get('name') for t in templates]}")
+    else:
+        print("未配置多模板（config.templates.list 为空），回退旧单模板逻辑")
 
     files_to_process = []
     for root, dirs, files in os.walk(NEW_DIR):
@@ -390,9 +439,15 @@ def process_articles():
                     title = line[2:].strip()
                     break
 
+        matched_template = match_template(content, templates)
+        if matched_template:
+            print(f"匹配到改写模板: {matched_template.get('name')} ({matched_template.get('id')})")
+        else:
+            print("未匹配到模板，使用旧单模板逻辑")
+
         matched_segment_id, matched_seg = identify_customer_segment(content, customer_segments)
         segment_info_str = ""
-        title_prefix_hint = "【老板必看】"
+        title_prefix_hint = cfg_get("content", "default_title_prefix", default="【老板必看】")
         if matched_seg:
             title_prefix_hint = matched_seg.get("title_prefix", title_prefix_hint)
             segment_info_str = (
@@ -409,12 +464,13 @@ def process_articles():
             print("客户群体识别失败，使用通用策略")
             segment_info_str = "通用中小企业老板视角：侧重合规、省钱、拿政策福利"
 
-        prompt = build_prompt(segment_info_str, content, title_prefix_hint, MIN_BENEFIT_HITS)
+        system_role = matched_template.get("role") if matched_template else cfg_get("prompt", "role", default="")
+        prompt = build_prompt(matched_template, segment_info_str, content, title_prefix_hint, MIN_BENEFIT_HITS)
 
         rewritten_content = None
         for attempt in range(MAX_RETRY + 1):
             print(f"调用 LLM 改写文章（第 {attempt + 1}/{MAX_RETRY + 1} 次）...")
-            rewritten_content = call_llm_api(prompt)
+            rewritten_content = call_llm_api(prompt, system_prompt=system_role or None)
             if rewritten_content is None or not rewritten_content.strip():
                 print("LLM API 调用失败或返回空，跳过此文件")
                 break
@@ -432,7 +488,7 @@ def process_articles():
                 f"（如'少花 5000 元官费''拿 10 万政府补贴''避免 50 万侵权赔偿''减免 15% 所得税'）"
                 "，每条给出数字或场景。"
             )
-            prompt = build_prompt(segment_info_str, content, title_prefix_hint, MIN_BENEFIT_HITS) + reinforce
+            prompt = build_prompt(matched_template, segment_info_str, content, title_prefix_hint, MIN_BENEFIT_HITS) + reinforce
 
         if rewritten_content is None or not rewritten_content.strip():
             continue
@@ -440,7 +496,11 @@ def process_articles():
         if title_prefix_hint:
             rewritten_content = apply_title_prefix(rewritten_content, title_prefix_hint)
 
-        frontmatter = build_frontmatter(matched_segment_id, matched_seg, title)
+        frontmatter = build_frontmatter(
+            matched_segment_id, matched_seg, title,
+            template_id=matched_template.get("id") if matched_template else None,
+            template_name=matched_template.get("name") if matched_template else None,
+        )
         if frontmatter:
             rewritten_content = frontmatter + rewritten_content
 

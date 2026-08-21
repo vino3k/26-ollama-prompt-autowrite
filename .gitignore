@@ -57,3 +57,6 @@ dxdiag.txt
 
 # Ignore Docker build artifacts
 docker-compose.override.yml
+
+# Ignore Docker runtime data mounts (processed articles, outputs)
+files/

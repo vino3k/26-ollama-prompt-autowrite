@@ -8,6 +8,30 @@
 
 ---
 
+## [1.2.0] - 2026-08-21
+
+### 新增功能 - 多模板匹配机制（通过公众号原创检测）
+
+- 新增 `config.templates` 多模板配置段，内置 3 个差异化改写模板：
+  - **政策公示类**（`policy_announcement`）：适配入库名单、公示、新规、数据播报，一线申报总监视角，独家实操复盘
+  - **干货科普类**（`knowledge_share`）：适配软著/专利/高企/财税科普，实战顾问视角，独家干货增量
+  - **客户案例复盘类**（`case_review`）：适配客户服务案例、申报复盘，独家案例复盘，内容唯一性
+- `process_articles.py` 新增 `load_templates()` 与 `match_template()`：按内容关键词打分匹配模板（`priority_keywords` 计 2 分、`match_keywords` 计 1 分，同分按 `match_priority` 决胜，全部未命中回退 `default_template`）
+- `build_prompt()` 重构为按匹配模板组装 Prompt；`templates.list` 为空时自动回退旧 `config.prompt` 单模板逻辑（向下兼容）
+- 匹配到的模板 `role` 在 Agnes 模式下作为 System Prompt 传入
+- 输出 frontmatter 新增 `template` / `template_name` 字段，记录实际使用的改写模板
+- 新增 `content.default_title_prefix`（默认 `【老板必看】`），替换代码中硬编码的标题前缀默认值
+
+### 功能优化
+
+- 客户群体匹配（`customer_segments.json`）保留为标题前缀/受众画像层，与模板匹配（写作风格层）解耦
+
+### 不兼容变更
+
+- 无（`config.prompt` 保留，作为 `templates.list` 为空时的回退逻辑）
+
+---
+
 ## [1.1.11] - 2026-07-29
 
 ### Prompt 优化 - 提升用户"收获感"

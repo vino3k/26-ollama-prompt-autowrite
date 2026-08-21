@@ -14,6 +14,7 @@
 | `llm` | object | LLM 提供方（Ollama / Agnes）的路由、地址、模型名、超时等 |
 | `content` | object | 内容改写规则：利益关键词、强制段落、标题前缀 |
 | `prompt` | object | System Prompt、Prompt 模板、公司背景、风格规则 |
+| `templates` | object | 多模板匹配机制：模板列表、匹配关键词、默认模板 |
 | `security` | object | 安全相关：配置文件名、允许扩展名等 |
 
 ---
@@ -82,6 +83,7 @@
 | `benefit_keywords` | list[str] | 见 `config.json` | 内容中"客户可感知实际利益"的关键词集合。每条至少出现一次即计入 |
 | `required_title_prefix` | list[str] | 固定条目 | 对标题前缀的**描述性约束**，将作为 Prompt 要求的一部分 |
 | `required_sections_after_body` | list[str] | 固定条目 | 正文之后必须包含的模块说明，作为 Prompt 约束 |
+| `default_title_prefix` | string | `【老板必看】` | 客户群体未匹配到专属前缀时使用的默认标题前缀 |
 
 > **注意**：`benefit_keywords` 为**公共非敏感配置**，可以提交代码库；若后续新增关键词请在 `config.json` 中追加并在本说明中列出新增语义。
 
@@ -103,7 +105,41 @@
 
 ---
 
-## 6. security（安全边界配置）
+## 6. templates（多模板匹配配置）
+
+> 多模板匹配机制：`process_articles.py` 根据文章内容关键词打分，从 `templates.list` 中选出最合适的改写模板，再按该模板的 role / company_background / style_rules / task_template 组装 Prompt。目的是让不同内容类型（政策公示 / 干货科普 / 案例复盘）使用差异化写作风格，通过公众号原创检测。
+
+### 6.1 顶层
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `_comment` | string | 固定 | 机制说明，仅自注释，不被程序读取 |
+| `default_template` | string | `knowledge_share` | 所有模板关键词均未命中时的兜底模板 `id` |
+| `list` | list[object] | 3 个模板 | 模板列表，按顺序遍历打分 |
+
+### 6.2 templates.list[]（单个模板）
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `id` | string | 必填 | 模板唯一标识（小写下划线，如 `policy_announcement`），写入输出 frontmatter 的 `template` 字段 |
+| `name` | string | 必填 | 模板中文名（如 `政策公示类`），写入 frontmatter 的 `template_name` 字段 |
+| `description` | string | 必填 | 适配场景说明，供维护者理解用途 |
+| `match_priority` | int | 必填 | 同分决胜优先级，**越小越优先**。当前：政策公示=1、干货科普=2、案例复盘=3 |
+| `priority_keywords` | list[str] | 必填 | 强信号关键词，命中 1 条计 **2 分**。用于区分度高的词（如"名单""公示""软著""案例"） |
+| `match_keywords` | list[str] | 必填 | 普通关键词，命中 1 条计 **1 分**。用于通用相关词（如"申报""认定""企业"） |
+| `role` | string | 必填 | LLM 角色定义，作为 Prompt 首段；Agnes 模式下同时作为 System Prompt |
+| `company_background` | string | 必填 | Prompt 中"公司背景"段落 |
+| `style_rules` | list[str] | 必填 | 写作规范规则集，按顺序用 `\n- ` 连接进入 Prompt |
+| `required_sections_after_body` | list[str] | 必填 | 文末固定模块说明，进入 Prompt |
+| `task_template` | string | 必填 | 主 Prompt 模板。占位符：`{role}`、`{source}`、`{company_background}`、`{style_rules_block}`、`{required_sections_block}` |
+
+> **匹配规则**：总得分 = 2×priority 命中数 + 1×match 命中数；得分最高者胜出；同分按 `match_priority` 决胜；全部为 0 分时回退 `default_template`。
+> **新增模板**：在 `list` 中追加对象，`id` 唯一、`match_priority` 不重复，并在 `CHANGELOG.md` 登记。
+> **回退兼容**：若 `templates.list` 为空或缺失，代码自动回退旧 `config.prompt` 单模板逻辑（含 `{standard_template}`、`{segment_info}` 占位符）。
+
+---
+
+## 7. security（安全边界配置）
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -114,7 +150,7 @@
 
 ---
 
-## 7. 修改约定
+## 8. 修改约定
 
 1. **新增字段**：追加到所属分类末尾，在本说明中新增一行，并标注类型/默认值/说明；完成后在 `CHANGELOG.md` 中登记。
 2. **修改字段语义**（如 `provider_env` 改名为 `provider_env_name`）：视为**不兼容变更**，必须在 `CHANGELOG.md` 的「不兼容变更」章节标注，并同步在代码中替换所有引用。
@@ -123,7 +159,7 @@
 
 ---
 
-## 8. 代码侧加载方式（参考）
+## 9. 代码侧加载方式（参考）
 
 ```python
 import json, os
@@ -145,8 +181,9 @@ def get(cfg: dict, *keys, default=None):
 
 ---
 
-## 9. 变更历史
+## 10. 变更历史
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 1.2.0 | 2026-08-21 | 新增 `templates` 多模板匹配段（政策公示/干货科普/案例复盘）+ `content.default_title_prefix` |
 | 1.1.0 | 2026-07-29 | 初版：由业务代码中散落的常量抽离而来 |
