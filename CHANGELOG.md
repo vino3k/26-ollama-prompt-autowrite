@@ -8,6 +8,35 @@
 
 ---
 
+## [1.4.1] - 2026-09-09
+
+### Bug 修复 - 模板匹配误匹配
+
+- **问题**：通知类强信号匹配（`force_policy_keywords` + `force_policy_context_keywords`）过于激进，只要全文中同时命中就强制匹配政策公示类，导致干货科普类和案例复盘类文章被误匹配
+- **修复**：
+  - 只在文章**前500字**检测通知类强信号（政策通知类文章通常在开头就有"通知""公告"等词，科普/案例文章可能在中间提到）
+  - 增加排除逻辑：如果案例复盘类（`case_review`）的 `priority_keywords` 命中≥2，则不强制匹配政策公示类
+
+### 功能优化 - 429退避重试机制
+
+- **问题**：Agnes API 返回429（限流）时直接失败，导致批量处理时大量文章被跳过
+- **修复**：`call_agnes_api` 新增429退避重试机制
+  - 遇到429时自动等待后重试，初始等待10秒，每次翻倍，最大60秒
+  - 最多重试3次（可通过 `llm.retry.retry_429_max_attempts` 配置）
+  - 超过最大重试次数后才返回失败
+
+### 配置变更
+
+- Agnes 模型升级：`config.llm.agnes.model` 从 `agnes-2.0-flash` 改为 `agnes-2.5-flash`（同步更新 process_articles.py 兜底默认值、config.readme.md、.env.example、.env.example.docker、AGENTS.md 黑名单）
+- `config.llm.retry` 新增3个配置项：`retry_429_max_attempts`（默认3）、`retry_429_initial_delay_seconds`（默认10）、`retry_429_max_delay_seconds`（默认60）
+- 版本号 1.4.0 → 1.4.1
+
+### 不兼容变更
+
+- 无（所有新增配置均有默认值，向下兼容）
+
+---
+
 ## [1.4.0] - 2026-09-09
 
 ### 新增功能 - 热点事件类模板（hot_topic）

@@ -54,16 +54,16 @@
 | `request_timeout_seconds` | int | 300 | 单次 LLM 请求超时（秒） |
 | `health_check_timeout_seconds` | int | 10 | `main.py` 中健康检查（GET `/api/tags`）的超时（秒） |
 
-### 3.3 llm.agnes（云端 Agnes-2.0-Flash）
+### 3.3 llm.agnes（云端 Agnes-2.5-Flash）
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `api_key_env` | string | `AGNES_API_KEY` | Agnes API Key **环境变量名**。真实 Key 必须仅出现在 `.env` 或系统环境变量中 |
 | `api_url` | string | `https://apihub.agnes-ai.cn/v1/chat/completions` | Agnes Chat Completions 接口地址 |
-| `model` | string | `agnes-2.0-flash` | Agnes 模型 ID |
+| `model` | string | `agnes-2.5-flash` | Agnes 模型 ID |
 | `max_tokens` | int | 4096 | `max_tokens` 参数上限 |
 | `temperature` | float | 0.7 | 采样温度（0~1） |
-| `thinking` | bool | `false` | 是否启用 Think 模式（经测试 Agnes-2.0-Flash 不支持有效 thinking，建议保持 false） |
+| `thinking` | bool | `false` | 是否启用 Think 模式（经测试 Agnes 系列模型不支持有效 thinking，建议保持 false） |
 | `request_timeout_seconds` | int | 300 | 单次 LLM 请求超时（秒） |
 
 ### 3.4 llm.retry（重试与内容校验）
@@ -73,6 +73,9 @@
 | `max_attempts` | int | 2 | **校验未通过**时的最大重试次数。总尝试次数 = `max_attempts + 1`（首次 + 重试） |
 | `min_benefit_hits` | int | 3 | 内容中必须命中的 `content.benefit_keywords` 数量。低于此值判定为不合格并触发重试 |
 | `default_system_prompt` | string | `你是一位资深知识产权内容策略师...` | Agnes 调用时的 System Prompt；Ollama 因无 Chat 接口不使用此字段 |
+| `retry_429_max_attempts` | int | 3 | Agnes API 返回429（限流）时的最大退避重试次数 |
+| `retry_429_initial_delay_seconds` | int | 10 | 429退避重试的初始等待时间（秒），每次翻倍 |
+| `retry_429_max_delay_seconds` | int | 60 | 429退避重试的最大等待时间（秒），超过此值不再增加 |
 
 ---
 

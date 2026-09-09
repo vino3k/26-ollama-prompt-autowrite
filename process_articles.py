@@ -10,6 +10,7 @@ import sys
 import json
 import shutil
 import requests
+import time
 
 
 def _load_dotenv(env_path):
@@ -97,7 +98,7 @@ OLLAMA_TIMEOUT = ollama_cfg.get("request_timeout_seconds", 300)
 agnes_cfg = cfg_get("llm", "agnes", default={})
 AGNES_API_KEY = os.environ.get(agnes_cfg.get("api_key_env", "AGNES_API_KEY"), "")
 AGNES_API_URL = agnes_cfg.get("api_url", "https://apihub.agnes-ai.cn/v1/chat/completions")
-AGNES_MODEL = agnes_cfg.get("model", "agnes-2.0-flash")
+AGNES_MODEL = agnes_cfg.get("model", "agnes-2.5-flash")
 AGNES_MAX_TOKENS = agnes_cfg.get("max_tokens", 4096)
 AGNES_TEMPERATURE = agnes_cfg.get("temperature", 0.7)
 AGNES_THINKING = agnes_cfg.get("thinking", True)
@@ -196,15 +197,27 @@ def match_template(content, templates):
     if not templates:
         return None
 
-    # 通知类强信号检测：同时出现政策公示类关键词 + 上下文关键词，强制匹配 policy_announcement
+    # 通知类强信号检测：只在文章前500字检测，且排除明显是案例复盘类的文章
     force_keywords = cfg_get("templates", "force_policy_keywords", default=[])
     context_keywords = cfg_get("templates", "force_policy_context_keywords", default=[])
-    has_force_signal = any(kw in content for kw in force_keywords) if force_keywords else False
-    has_context_signal = any(kw in content for kw in context_keywords) if context_keywords else False
-    if has_force_signal and has_context_signal:
+
+    # 只检测文章前500字（政策通知类文章通常在开头就有"通知""公告"等词，
+    # 科普/案例文章可能在中间提到这些词，避免误匹配）
+    content_head = content[:500] if len(content) > 500 else content
+    has_force_signal = any(kw in content_head for kw in force_keywords) if force_keywords else False
+    has_context_signal = any(kw in content_head for kw in context_keywords) if context_keywords else False
+
+    # 排除案例复盘类：如果case_review的priority_keywords命中>=2，不强制匹配
+    case_priority_hits = 0
+    for tpl in templates:
+        if tpl.get("id") == "case_review":
+            case_priority_hits = sum(1 for kw in tpl.get("priority_keywords", []) if kw and kw in content)
+            break
+
+    if has_force_signal and has_context_signal and case_priority_hits < 2:
         for tpl in templates:
             if tpl.get("id") == "policy_announcement":
-                print(f"通知类强信号命中，强制匹配模板: {tpl.get('name')} ({tpl.get('id')})")
+                print(f"通知类强信号命中（文章开头检测，案例关键词命中{case_priority_hits}），强制匹配模板: {tpl.get('name')} ({tpl.get('id')})")
                 return tpl
 
     scored = []
@@ -321,7 +334,7 @@ def call_ollama_api(prompt):
 
 
 def call_agnes_api(prompt, system_prompt=None):
-    """调用云端 Agnes-2.0-Flash。URL 与所有参数从 config + 环境变量读取。"""
+    """调用云端 Agnes API。URL 与所有参数从 config + 环境变量读取。"""
     if not AGNES_API_KEY:
         print(f"错误: 未设置环境变量 {agnes_cfg.get('api_key_env', 'AGNES_API_KEY')}，无法调用 Agnes API")
         return None
@@ -344,67 +357,89 @@ def call_agnes_api(prompt, system_prompt=None):
     if AGNES_THINKING:
         data["chat_template_kwargs"] = {"enable_thinking": True}
 
-    try:
-        print(f"正在调用 Agnes API，URL: {AGNES_API_URL}")
-        print(f"模型: {AGNES_MODEL}, Thinking: {AGNES_THINKING}")
-        print(f"Prompt 长度: {len(prompt)} 字符")
-        response = requests.post(AGNES_API_URL, headers=headers, json=data, timeout=AGNES_TIMEOUT)
-        print(f"API 响应状态码: {response.status_code}")
-        
-        # 打印完整响应用于调试
+    # 429退避重试配置
+    retry_429_max = cfg_get("llm", "retry", "retry_429_max_attempts", default=3)
+    retry_429_initial = cfg_get("llm", "retry", "retry_429_initial_delay_seconds", default=10)
+    retry_429_max_delay = cfg_get("llm", "retry", "retry_429_max_delay_seconds", default=60)
+    response = None
+
+    for attempt_429 in range(retry_429_max + 1):
         try:
-            result = response.json()
-            print(f"响应 JSON keys: {list(result.keys())}")
-            if "choices" in result:
-                choice = result["choices"][0]
-                print(f"choice keys: {list(choice.keys())}")
-                if "message" in choice:
-                    print(f"message keys: {list(choice['message'].keys())}")
-        except:
-            print(f"响应原文(前500字符): {response.text[:500]}")
-        
-        response.raise_for_status()
+            print(f"正在调用 Agnes API（第{attempt_429 + 1}/{retry_429_max + 1}次），URL: {AGNES_API_URL}")
+            print(f"模型: {AGNES_MODEL}, Thinking: {AGNES_THINKING}")
+            print(f"Prompt 长度: {len(prompt)} 字符")
+            response = requests.post(AGNES_API_URL, headers=headers, json=data, timeout=AGNES_TIMEOUT)
+            print(f"API 响应状态码: {response.status_code}")
+
+            # 429限流：退避重试
+            if response.status_code == 429 and attempt_429 < retry_429_max:
+                delay = min(retry_429_initial * (2 ** attempt_429), retry_429_max_delay)
+                print(f"遇到429限流，等待{delay}秒后重试（第{attempt_429 + 1}次退避）...")
+                time.sleep(delay)
+                continue
+            break  # 非429或已达最大重试次数，跳出循环
+
+        except requests.exceptions.ConnectionError as e:
+            print(f"连接错误: 无法连接到 Agnes API: {e}")
+            break
+        except requests.exceptions.Timeout as e:
+            print(f"超时错误: Agnes API 调用超时({AGNES_TIMEOUT}s): {e}")
+            break
+        except Exception as e:
+            print(f"调用 Agnes API 失败: {e}")
+            import traceback
+            traceback.print_exc()
+            break
+
+    if response is None:
+        return None
+
+    # 打印完整响应用于调试
+    try:
         result = response.json()
-        choices = result.get("choices", [])
-        if not choices:
-            print("警告: API 返回空的 choices")
-            return None
-        
-        # 处理思考/输出分离：优先取 content（最终输出），仅在 content 为空时考虑 reasoning_content
-        # 注意：Agnes API 即使关闭 thinking，也会返回 reasoning_content（包含思考过程），必须忽略
-        message = choices[0].get("message", {})
+        print(f"响应 JSON keys: {list(result.keys())}")
+        if "choices" in result:
+            choice = result["choices"][0]
+            print(f"choice keys: {list(choice.keys())}")
+            if "message" in choice:
+                print(f"message keys: {list(choice['message'].keys())}")
+    except:
+        print(f"响应原文(前500字符): {response.text[:500]}")
 
-        # 优先取 content（最终输出的文章正文）
-        response_text = message.get("content", "")
+    if response.status_code != 200:
+        print(f"HTTP 错误: {response.status_code}")
+        return None
+    result = response.json()
+    choices = result.get("choices", [])
+    if not choices:
+        print("警告: API 返回空的 choices")
+        return None
+    
+    # 处理思考/输出分离：优先取 content（最终输出），仅在 content 为空时考虑 reasoning_content
+    # 注意：Agnes API 即使关闭 thinking，也会返回 reasoning_content（包含思考过程），必须忽略
+    message = choices[0].get("message", {})
 
-        # 如果 content 是数组（某些 API 格式），取文本内容
-        if isinstance(response_text, list):
-            text_parts = []
-            for item in response_text:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    text_parts.append(item.get("text", ""))
-            response_text = "".join(text_parts)
+    # 优先取 content（最终输出的文章正文）
+    response_text = message.get("content", "")
 
-        # 如果 content 存在但为空，警告并尝试 reasoning_content（兜底）
-        if not response_text or not response_text.strip():
-            reasoning = message.get("reasoning_content", "")
-            if reasoning and reasoning.strip():
-                print(f"警告: content 为空，fallback 到 reasoning_content（{len(reasoning)}字符），可能是思考过程而非正文")
-                response_text = reasoning
+    # 如果 content 是数组（某些 API 格式），取文本内容
+    if isinstance(response_text, list):
+        text_parts = []
+        for item in response_text:
+            if isinstance(item, dict) and item.get("type") == "text":
+                text_parts.append(item.get("text", ""))
+        response_text = "".join(text_parts)
 
-        print(f"生成内容长度: {len(response_text)} 字符")
-        return response_text if response_text and response_text.strip() else None
-    except requests.exceptions.ConnectionError as e:
-        print(f"连接错误: 无法连接到 Agnes API: {e}")
-    except requests.exceptions.Timeout as e:
-        print(f"超时错误: Agnes API 调用超时({AGNES_TIMEOUT}s): {e}")
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP 错误: {e}")
-    except Exception as e:
-        print(f"调用 Agnes API 失败: {e}")
-        import traceback
-        traceback.print_exc()
-    return None
+    # 如果 content 存在但为空，警告并尝试 reasoning_content（兜底）
+    if not response_text or not response_text.strip():
+        reasoning = message.get("reasoning_content", "")
+        if reasoning and reasoning.strip():
+            print(f"警告: content 为空，fallback 到 reasoning_content（{len(reasoning)}字符），可能是思考过程而非正文")
+            response_text = reasoning
+
+    print(f"生成内容长度: {len(response_text)} 字符")
+    return response_text if response_text and response_text.strip() else None
+
 
 
 def call_llm_api(prompt, system_prompt=None):

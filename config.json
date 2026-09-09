@@ -1,6 +1,6 @@
 {
   "_comment": "应用配置文件。所有可配置常量、业务参数统一在本文件维护，业务代码通过 load_config() 加载。涉及敏感值（真实 API Key 等）一律走环境变量，config.json 仅保留占位或默认值。",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "monitor": {
     "scan_interval_seconds": 3600,
     "lock_max_age_seconds": 3600,
@@ -33,7 +33,7 @@
     "agnes": {
       "api_key_env": "AGNES_API_KEY",
       "api_url": "https://apihub.agnes-ai.cn/v1/chat/completions",
-      "model": "agnes-2.0-flash",
+      "model": "agnes-2.5-flash",
       "max_tokens": 4096,
       "temperature": 0.7,
       "thinking": false,
@@ -42,7 +42,10 @@
     "retry": {
       "max_attempts": 2,
       "min_benefit_hits": 3,
-      "default_system_prompt": "你是一位资深知识产权内容策略师，擅长将专业内容改写成符合移动端阅读习惯、具有传播力的爆款文章。"
+      "default_system_prompt": "你是一位资深知识产权内容策略师，擅长将专业内容改写成符合移动端阅读习惯、具有传播力的爆款文章。",
+      "retry_429_max_attempts": 3,
+      "retry_429_initial_delay_seconds": 10,
+      "retry_429_max_delay_seconds": 60
     }
   },
   "content": {
