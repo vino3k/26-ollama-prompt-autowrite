@@ -117,6 +117,30 @@ BENEFIT_KEYWORDS = cfg_get(
     "content", "benefit_keywords",
     default=[],
 )
+ORIGINALITY_SIGNAL_WORDS = cfg_get(
+    "content", "originality_signal_words",
+    default=[],
+)
+MIN_ORIGINALITY_HITS = cfg_get(
+    "content", "min_originality_hits",
+    default=5,
+)
+BANNED_SECTION_PATTERNS = cfg_get(
+    "content", "banned_section_patterns",
+    default=[],
+)
+BANNED_MARKETING_PHRASES = cfg_get(
+    "content", "banned_marketing_phrases",
+    default=[],
+)
+REQUIRED_LOCAL_SCENE_WORDS = cfg_get(
+    "content", "required_local_scene_words",
+    default=[],
+)
+MIN_LOCAL_SCENE_HITS = cfg_get(
+    "content", "min_local_scene_hits",
+    default=2,
+)
 
 
 def load_standard_template():
@@ -166,9 +190,23 @@ def match_template(content, templates):
     """根据内容关键词打分匹配最合适的改写模板。
     命中 priority_keywords 计 2 分，命中 match_keywords 计 1 分；
     同分时按 match_priority（越小越优先）决胜；全部未命中时回退 default_template。
+    通知类强信号检测：force_policy_keywords + force_policy_context_keywords 同时命中时，
+    强制匹配 policy_announcement，避免展会/通知类文章被干货科普模板抢走。
     """
     if not templates:
         return None
+
+    # 通知类强信号检测：同时出现政策公示类关键词 + 上下文关键词，强制匹配 policy_announcement
+    force_keywords = cfg_get("templates", "force_policy_keywords", default=[])
+    context_keywords = cfg_get("templates", "force_policy_context_keywords", default=[])
+    has_force_signal = any(kw in content for kw in force_keywords) if force_keywords else False
+    has_context_signal = any(kw in content for kw in context_keywords) if context_keywords else False
+    if has_force_signal and has_context_signal:
+        for tpl in templates:
+            if tpl.get("id") == "policy_announcement":
+                print(f"通知类强信号命中，强制匹配模板: {tpl.get('name')} ({tpl.get('id')})")
+                return tpl
+
     scored = []
     for tpl in templates:
         score = sum(2 for kw in tpl.get("priority_keywords", []) if kw and kw in content)
@@ -189,6 +227,34 @@ def count_benefit_hits(content):
     if not content:
         return 0
     return sum(1 for kw in BENEFIT_KEYWORDS if kw and kw in content)
+
+
+def count_originality_hits(content):
+    """统计输出中独家内容信号词的命中数量，用于后置原创度校验。"""
+    if not content:
+        return 0
+    return sum(1 for kw in ORIGINALITY_SIGNAL_WORDS if kw and kw in content)
+
+
+def count_section_pattern_hits(content):
+    """检测输出中是否包含禁止的章节编号（一、二、三、1.1等），返回命中数。"""
+    if not content:
+        return 0
+    return sum(1 for pat in BANNED_SECTION_PATTERNS if pat and pat in content)
+
+
+def count_marketing_hits(content):
+    """检测输出中是否包含禁止的营销话术（全流程代办、一站式搞定等），返回命中数。"""
+    if not content:
+        return 0
+    return sum(1 for phrase in BANNED_MARKETING_PHRASES if phrase and phrase in content)
+
+
+def count_local_scene_hits(content):
+    """统计输出中本地场景词（广东、深圳、我们经手等）的命中数量，用于校验是否有足够本地实操内容。"""
+    if not content:
+        return 0
+    return sum(1 for kw in REQUIRED_LOCAL_SCENE_WORDS if kw and kw in content)
 
 
 def apply_title_prefix(content, prefix):
@@ -476,18 +542,53 @@ def process_articles():
                 break
 
             hits = count_benefit_hits(rewritten_content)
+            originality_hits = count_originality_hits(rewritten_content)
+            section_hits = count_section_pattern_hits(rewritten_content)
+            marketing_hits = count_marketing_hits(rewritten_content)
+            local_scene_hits = count_local_scene_hits(rewritten_content)
             print(f"实际利益关键词命中: {hits}/{MIN_BENEFIT_HITS}")
-            if hits >= MIN_BENEFIT_HITS:
+            print(f"原创信号词命中: {originality_hits}/{MIN_ORIGINALITY_HITS}")
+            print(f"章节编号检测: {section_hits} (应为0)")
+            print(f"营销话术检测: {marketing_hits} (应为0)")
+            print(f"本地场景词命中: {local_scene_hits}/{MIN_LOCAL_SCENE_HITS}")
+            if (hits >= MIN_BENEFIT_HITS
+                    and originality_hits >= MIN_ORIGINALITY_HITS
+                    and section_hits == 0
+                    and marketing_hits == 0
+                    and local_scene_hits >= MIN_LOCAL_SCENE_HITS):
                 print("校验通过")
                 break
 
             print("校验未通过，追加更严格要求到 Prompt")
-            reinforce = (
-                "\n\n【重要补充】上一版缺少明确的'客户可感知实际利益'，请严格重写："
-                f"必须在正文中明确写出至少 {MIN_BENEFIT_HITS} 条具体、可量化的实际利益"
-                f"（如'少花 5000 元官费''拿 10 万政府补贴''避免 50 万侵权赔偿''减免 15% 所得税'）"
-                "，每条给出数字或场景。"
-            )
+            reinforce_parts = []
+            if hits < MIN_BENEFIT_HITS:
+                reinforce_parts.append(
+                    f"上一版缺少明确的'客户可感知实际利益'，必须在正文中明确写出至少 {MIN_BENEFIT_HITS} 条具体、可量化的实际利益"
+                    f"（如'少花 5000 元官费''拿 10 万政府补贴''避免 50 万侵权赔偿''减免 15% 所得税'），每条给出数字或场景。"
+                )
+            if originality_hits < MIN_ORIGINALITY_HITS:
+                reinforce_parts.append(
+                    "上一版独家实操内容不足，公共信息占比过高。请严格重写："
+                    "大幅增加本机构服务案例、广东本地企业踩坑复盘、本年度申报新趋势观察、反常识观点等独家内容，"
+                    "减少对官方通知、公示数据、政策条文的大段复述。公共信息占比控制在25%以内。"
+                )
+            if section_hits > 0:
+                reinforce_parts.append(
+                    "上一版使用了固定章节编号（一、二、三、1.1等），这是AI同质化文章的典型特征。请严格重写："
+                    "删除所有章节编号，改用自然的小标题组织内容，不要使用任何序号标记。"
+                )
+            if marketing_hits > 0:
+                reinforce_parts.append(
+                    "上一版包含营销话术（全流程代办、一站式搞定、我们提供等）。请严格重写："
+                    "删除所有销售话术，机构业务自然融入场景即可，互动提问保持纯粹的知识交流风格，不要使用'免费评估''留言送方案'等引流话术。"
+                )
+            if local_scene_hits < MIN_LOCAL_SCENE_HITS:
+                reinforce_parts.append(
+                    f"上一版缺少广东本地企业实操场景。请严格重写："
+                    f"必须包含至少 {MIN_LOCAL_SCENE_HITS} 个广东本地企业（深圳/东莞/佛山/中山/广州等）的真实踩坑场景或服务案例，"
+                    f"每个场景包含具体问题、原因、后果，使用'我们经手''我们服务'等第一人称复盘口吻。"
+                )
+            reinforce = "\n\n【重要补充】" + " ".join(reinforce_parts)
             prompt = build_prompt(matched_template, segment_info_str, content, title_prefix_hint, MIN_BENEFIT_HITS) + reinforce
 
         if rewritten_content is None or not rewritten_content.strip():

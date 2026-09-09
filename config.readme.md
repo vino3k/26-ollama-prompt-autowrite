@@ -84,6 +84,12 @@
 | `required_title_prefix` | list[str] | 固定条目 | 对标题前缀的**描述性约束**，将作为 Prompt 要求的一部分 |
 | `required_sections_after_body` | list[str] | 固定条目 | 正文之后必须包含的模块说明，作为 Prompt 约束 |
 | `default_title_prefix` | string | `【老板必看】` | 客户群体未匹配到专属前缀时使用的默认标题前缀 |
+| `originality_signal_words` | list[str] | 见 `config.json` | 独家内容信号词集合（如"我们经手""广东企业""踩坑""复盘""反常识"等）。用于后置原创度校验，输出中命中越多表示独家实操内容越充分 |
+| `min_originality_hits` | int | `5` | 输出中必须命中的 `originality_signal_words` 最低数量。低于此值判定为原创度不足并触发重试 |
+| `banned_section_patterns` | list[str] | 见 `config.json` | 禁止的章节编号模式（如"一、""二、""1.1""2.1"等）。后置校验命中数必须为0，否则触发重试。用于避免AI同质化文章结构 |
+| `banned_marketing_phrases` | list[str] | 见 `config.json` | 禁止的营销话术（如"全流程代办""一站式搞定""免费评估""留言送方案"等）。后置校验命中数必须为0，否则触发重试 |
+| `required_local_scene_words` | list[str] | 见 `config.json` | 本地场景词集合（如"广东""深圳""东莞""我们经手""一线""实操"等）。用于校验输出是否包含足够的广东本地企业实操内容 |
+| `min_local_scene_hits` | int | `2` | 输出中必须命中的 `required_local_scene_words` 最低数量。低于此值判定为本地实操内容不足并触发重试 |
 
 > **注意**：`benefit_keywords` 为**公共非敏感配置**，可以提交代码库；若后续新增关键词请在 `config.json` 中追加并在本说明中列出新增语义。
 
@@ -115,7 +121,9 @@
 |------|------|--------|------|
 | `_comment` | string | 固定 | 机制说明，仅自注释，不被程序读取 |
 | `default_template` | string | `knowledge_share` | 所有模板关键词均未命中时的兜底模板 `id` |
-| `list` | list[object] | 3 个模板 | 模板列表，按顺序遍历打分 |
+| `force_policy_keywords` | list[str] | 见 `config.json` | 通知类强信号词（第一组，如"通知""公告""公示""征集""展会"等）。与 `force_policy_context_keywords` 同时命中时，强制匹配 `policy_announcement` 模板，避免展会/通知类文章被干货科普模板抢走 |
+| `force_policy_context_keywords` | list[str] | 见 `config.json` | 通知类强信号词（第二组，上下文词，如"截止""报名""时间""地点""主办"等）。与 `force_policy_keywords` 同时命中时触发强制匹配 |
+| `list` | list[object] | 4 个模板 | 模板列表，按顺序遍历打分。当前：policy_announcement（政策公示）、knowledge_share（干货科普）、case_review（案例复盘）、hot_topic（热点事件） |
 
 ### 6.2 templates.list[]（单个模板）
 
@@ -124,7 +132,7 @@
 | `id` | string | 必填 | 模板唯一标识（小写下划线，如 `policy_announcement`），写入输出 frontmatter 的 `template` 字段 |
 | `name` | string | 必填 | 模板中文名（如 `政策公示类`），写入 frontmatter 的 `template_name` 字段 |
 | `description` | string | 必填 | 适配场景说明，供维护者理解用途 |
-| `match_priority` | int | 必填 | 同分决胜优先级，**越小越优先**。当前：政策公示=1、干货科普=2、案例复盘=3 |
+| `match_priority` | int | 必填 | 同分决胜优先级，**越小越优先**。当前：政策公示=1、干货科普=2、案例复盘=3、热点事件=4 |
 | `priority_keywords` | list[str] | 必填 | 强信号关键词，命中 1 条计 **2 分**。用于区分度高的词（如"名单""公示""软著""案例"） |
 | `match_keywords` | list[str] | 必填 | 普通关键词，命中 1 条计 **1 分**。用于通用相关词（如"申报""认定""企业"） |
 | `role` | string | 必填 | LLM 角色定义，作为 Prompt 首段；Agnes 模式下同时作为 System Prompt |
@@ -185,5 +193,7 @@ def get(cfg: dict, *keys, default=None):
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 1.4.0 | 2026-09-09 | 热点事件类模板+后置校验强化：新增 `hot_topic` 热点事件类模板（适配科研发现/热点新闻/行业动态+知识产权类比，热点信息≤20%，强制2个本地踩坑+1个反常识+1个趋势观察）；统一强化4个模板共性约束（禁止章节编号、禁止全流程代办/一站式搞定等营销话术、强制2个广东本地案例、关键数据准确性约束）；新增3项后置校验——章节编号检测（`banned_section_patterns`，命中=0才通过）、营销话术检测（`banned_marketing_phrases`，命中=0才通过）、本地场景词检测（`required_local_scene_words` + `min_local_scene_hits=2`）；校验不通过自动重试并在Prompt中追加对应强化要求 |
+| 1.3.0 | 2026-09-03 | 原创度强化：policy_announcement 扩充关键词（展会/参展/征集等）+ 强化 style_rules（公共信息≤25%、幻觉防护、强制2个本地踩坑场景+1个独家趋势+1个反常识）；knowledge_share 收窄 priority_keywords（"专利"降级为 match）；全局删除"保持原文核心信息不变"冲突条款；新增 `content.originality_signal_words` + `min_originality_hits` 后置原创度校验；`match_template` 新增通知类强信号强制匹配（`force_policy_keywords` + `force_policy_context_keywords`）；全模板 style_rules + customer_segments 弱化营销引流话术（去掉"免费评估/免费帮你"等，改为纯粹知识交流） |
 | 1.2.0 | 2026-08-21 | 新增 `templates` 多模板匹配段（政策公示/干货科普/案例复盘）+ `content.default_title_prefix` |
 | 1.1.0 | 2026-07-29 | 初版：由业务代码中散落的常量抽离而来 |
