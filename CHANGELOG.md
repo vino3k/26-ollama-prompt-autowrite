@@ -8,6 +8,20 @@
 
 ---
 
+## [1.4.2] - 2026-09-16
+
+### Bug 修复 - 挂载卷异常文件名导致批处理崩溃
+
+- **问题**：Windows 宿主通过 Docker Desktop 挂载卷传入的待处理文件，若文件名含 emoji/特殊字符（Linux 侧按 UTF-8 解码为 surrogate），`process_articles.py` 在 `print` 文件名时抛 `UnicodeEncodeError`，整个批次 20 个文件全部卡住，监控每小时重试均失败
+- **修复**：
+  - `process_articles.py` 启动时对 stdout/stderr 执行 `reconfigure(errors="replace")`，杜绝打印路径崩溃
+  - 新增 `sanitize_filenames()`：遍历 new 目录，将无法 UTF-8 编码的文件名自动重命名为安全名（bytes 路径无损还原原始字节，冲突自动加序号），并记录告警日志
+  - `main.py` 的 `get_file_hash()` 对无法 open 的文件不再静默跳过（返回 `"unreadable"` 标记），保证目录中只有异常文件名时也能触发处理脚本
+
+### 功能优化
+
+- 异常文件名自动修复后可正常进入模板匹配与改写流程，无需人工干预
+
 ## [1.4.1] - 2026-09-09
 
 ### Bug 修复 - 模板匹配误匹配

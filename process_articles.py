@@ -12,6 +12,12 @@ import shutil
 import requests
 import time
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except Exception:
+        pass
+
 
 def _load_dotenv(env_path):
     """
@@ -68,6 +74,36 @@ OLD_DIR = os.path.join(BASE_DIR, "old")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 STANDARD_FILE = os.path.join(BASE_DIR, cfg_get("security", "template_file", default="standard-template.md"))
 CUSTOMER_SEGMENTS_FILE = os.path.join(BASE_DIR, cfg_get("security", "config_file", default="customer_segments.json"))
+
+
+def sanitize_filenames(root_dir):
+    """把无法 UTF-8 编码的文件名（Windows 挂载卷里的 emoji/特殊字符在
+    Linux 侧解码为 surrogate）重命名为安全名，避免 open/print 崩溃。
+    重命名用 bytes 路径，可无损还原原始字节；返回修复数量。"""
+    renamed = 0
+    for root, dirs, files in os.walk(root_dir):
+        for name in files:
+            try:
+                name.encode("utf-8")
+                continue
+            except UnicodeEncodeError:
+                pass
+            safe = name.encode("utf-8", "replace").decode("utf-8", "replace")
+            safe = safe.strip() or "_unnamed_"
+            candidate, i = safe, 1
+            while os.path.exists(os.path.join(root, candidate)):
+                base, ext = os.path.splitext(safe)
+                candidate = f"{base}_{i}{ext}"
+                i += 1
+            try:
+                os.rename(os.fsencode(os.path.join(root, name)),
+                          os.fsencode(os.path.join(root, candidate)))
+            except OSError as e:
+                print(f"警告: 无法重命名异常文件 {name!r}: {e}")
+                continue
+            renamed += 1
+            print(f"警告: 文件名含非法字符，已自动重命名: {name!r} -> {candidate}")
+    return renamed
 
 
 # ===== LLM 配置（全部从 config + 环境变量读取）=====
@@ -501,6 +537,10 @@ def build_prompt(template, segment_info_str, content, title_prefix_hint, min_ben
 def process_articles():
     os.makedirs(OLD_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    sanitized = sanitize_filenames(NEW_DIR)
+    if sanitized:
+        print(f"已自动修复 {sanitized} 个异常文件名")
 
     customer_segments = load_customer_segments()
     templates = load_templates()

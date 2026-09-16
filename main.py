@@ -14,6 +14,12 @@ import subprocess
 import requests
 from pathlib import Path
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except Exception:
+        pass
+
 # ===== 配置加载 =====
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
@@ -82,7 +88,9 @@ def get_file_hash(file_path):
         with open(file_path, 'rb') as f:
             return hashlib.md5(f.read()).hexdigest()
     except Exception:
-        return None
+        # 文件名含非法字节（挂载卷 emoji 等）时无法 open：标记存在，
+        # 交给 process_articles.py 的 sanitize_filenames 自动重命名修复
+        return "unreadable"
 
 
 def scan_new_directory():
