@@ -93,6 +93,12 @@
 | `banned_marketing_phrases` | list[str] | 见 `config.json` | 禁止的营销话术（如"全流程代办""一站式搞定""免费评估""留言送方案"等）。后置校验命中数必须为0，否则触发重试 |
 | `required_local_scene_words` | list[str] | 见 `config.json` | 本地场景词集合（如"广东""深圳""东莞""我们经手""一线""实操"等）。用于校验输出是否包含足够的广东本地企业实操内容 |
 | `min_local_scene_hits` | int | `2` | 输出中必须命中的 `required_local_scene_words` 最低数量。低于此值判定为本地实操内容不足并触发重试 |
+| `title_pain_keywords` | list[str] | 见 `config.json` | 标题痛点词集合（如"评不上""被刷下来""拿不到补贴""丢订单""错过"等）。用于SOP标题规范校验，检测标题是否包含痛点词 |
+| `min_title_pain_hits` | int | `1` | 标题中必须命中的 `title_pain_keywords` 最低数量。低于此值判定为标题不戳痛点并触发重试 |
+| `opening_case_keywords` | list[str] | 见 `config.json` | 开头案例词集合（如"深圳""东莞""某企业""一家""评审""专家""被刷"等）。用于SOP开头规范校验，检测文章开头前300字是否包含案例要素 |
+| `min_opening_case_hits` | int | `2` | 开头前300字中必须命中的 `opening_case_keywords` 最低数量。低于此值判定为开头缺少案例并触发重试 |
+| `forward_hook_keywords` | list[str] | 见 `config.json` | 转发钩子词集合（如"转发""建议转发""研发负责人""项目申报""CTO""财务""老板"等）。用于SOP转发规范校验，检测文末300字是否包含转发价值说明 |
+| `min_forward_hook_hits` | int | `2` | 文末300字中必须命中的 `forward_hook_keywords` 最低数量。低于此值判定为文末缺少转发钩子并触发重试 |
 
 > **注意**：`benefit_keywords` 为**公共非敏感配置**，可以提交代码库；若后续新增关键词请在 `config.json` 中追加并在本说明中列出新增语义。
 

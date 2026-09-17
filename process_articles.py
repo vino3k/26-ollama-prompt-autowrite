@@ -8,6 +8,7 @@
 import os
 import sys
 import json
+import re
 import shutil
 import requests
 import time
@@ -179,6 +180,35 @@ MIN_LOCAL_SCENE_HITS = cfg_get(
     default=2,
 )
 
+# SOP传播校验配置
+TITLE_PAIN_KEYWORDS = cfg_get(
+    "content", "title_pain_keywords",
+    default=[],
+)
+OPENING_CASE_KEYWORDS = cfg_get(
+    "content", "opening_case_keywords",
+    default=[],
+)
+FORWARD_HOOK_KEYWORDS = cfg_get(
+    "content", "forward_hook_keywords",
+    default=[],
+)
+MIN_TITLE_PAIN_HITS = cfg_get(
+    "content", "min_title_pain_hits",
+    default=1,
+)
+MIN_OPENING_CASE_HITS = cfg_get(
+    "content", "min_opening_case_hits",
+    default=2,
+)
+MIN_FORWARD_HOOK_HITS = cfg_get(
+    "content", "min_forward_hook_hits",
+    default=2,
+)
+
+# API调用间隔（减少429限流）
+API_CALL_INTERVAL = cfg_get("llm", "retry", "api_call_interval_seconds", default=5)
+
 
 def load_standard_template():
     if os.path.exists(STANDARD_FILE):
@@ -304,6 +334,151 @@ def count_local_scene_hits(content):
     if not content:
         return 0
     return sum(1 for kw in REQUIRED_LOCAL_SCENE_WORDS if kw and kw in content)
+
+
+def count_title_pain_hits(content):
+    """检测标题中是否包含痛点词（评不上、被刷下来、拿不到补贴等），用于SOP标题规范校验。
+    检测逻辑：去掉frontmatter，在前300字内查找有效标题行（跳过'标题''正文'等占位符），
+    优先#开头，其次【】开头，最后取前100字。"""
+    if not content:
+        return 0
+    # 去掉frontmatter（---之间的内容）
+    text = content
+    if text.startswith('---'):
+        end_idx = text.find('---', 3)
+        if end_idx > 0:
+            text = text[end_idx + 3:]
+    # 取前300字
+    head = text[:300] if len(text) > 300 else text
+    lines = head.split('\n')
+
+    def is_placeholder(title_text):
+        """判断是否是占位符标题（'标题''正文''内容'等，或【】+占位符）"""
+        if not title_text:
+            return True
+        # 去掉【】前缀
+        clean = title_text
+        if clean.startswith('【'):
+            end_bracket = clean.find('】')
+            if end_bracket > 0:
+                clean = clean[end_bracket + 1:].strip()
+        # 去掉#前缀
+        clean = clean.lstrip('#').strip()
+        # 如果剩余部分是占位符关键词，或长度<=2，认为是占位符
+        placeholders = ['标题', '正文', '内容', '文章标题', '文章正文', '此处标题', '标题占位']
+        if clean in placeholders:
+            return True
+        if len(clean) <= 2:
+            return True
+        return False
+
+    title_line = ''
+    # 第一轮：找#开头的有效标题行（跳过占位符）
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith('#'):
+            title_text = stripped.lstrip('#').strip()
+            if not is_placeholder(title_text):
+                title_line = title_text
+                break
+    # 第二轮：如果没找到#标题，找【】开头的行
+    if not title_line:
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('【') and len(stripped) > 5:
+                if not is_placeholder(stripped):
+                    title_line = stripped
+                    break
+    # 第三轮：如果都没找到，取前100字
+    if not title_line:
+        title_line = head[:100]
+    return sum(1 for kw in TITLE_PAIN_KEYWORDS if kw and kw in title_line)
+
+
+def count_opening_case_hits(content):
+    """检测开头是否包含案例要素（具体城市、某企业、评审专家等），用于SOP开头规范校验。只检测前300字。"""
+    if not content:
+        return 0
+    # 去掉frontmatter（---之间的内容）
+    text = content
+    if text.startswith('---'):
+        end_idx = text.find('---', 3)
+        if end_idx > 0:
+            text = text[end_idx + 3:]
+    # 取前300字（去掉标题行）
+    lines = text.split('\n')
+    body_lines = [l for l in lines if not l.strip().startswith('#')]
+    body = '\n'.join(body_lines).strip()
+    opening = body[:300] if len(body) > 300 else body
+    return sum(1 for kw in OPENING_CASE_KEYWORDS if kw and kw in opening)
+
+
+def count_forward_hook_hits(content):
+    """检测文末是否包含转发钩子（转发给、研发负责人、项目申报等），用于SOP转发规范校验。只检测文末300字。"""
+    if not content:
+        return 0
+    # 取文末300字
+    ending = content[-300:] if len(content) > 300 else content
+    return sum(1 for kw in FORWARD_HOOK_KEYWORDS if kw and kw in ending)
+
+
+def remove_section_numbers(content):
+    """后处理：去掉独立成行的章节编号（一、二、三、1. 2. 等），并把标题文字加粗。
+    只处理独立成行的标题，不处理正文中的列表项。"""
+    if not content:
+        return content
+
+    lines = content.split('\n')
+    result = []
+    removed_count = 0
+
+    # 章节编号模式
+    patterns = [
+        r'^[一二三四五六七八九十百]+[、.．]\s*',  # 中文数字+顿号/点
+        r'^\d{1,2}[、.．]\s*',  # 阿拉伯数字+顿号/点
+        r'^[（(][一二三四五六七八九十百]+[）)]\s*',  # 括号中文数字
+        r'^第[一二三四五六七八九十百\d]+[、.．:：]\s*',  # 第X+标点
+    ]
+
+    in_frontmatter = False
+    for line in lines:
+        stripped = line.strip()
+        # 跳过frontmatter
+        if stripped == '---':
+            in_frontmatter = not in_frontmatter
+            result.append(line)
+            continue
+        if in_frontmatter:
+            result.append(line)
+            continue
+
+        # 跳过空行、已经是markdown标题的行（#开头）、已经加粗的行
+        if not stripped or stripped.startswith('#') or stripped.startswith('**'):
+            result.append(line)
+            continue
+
+        # 检测是否以章节编号开头
+        matched = False
+        for pattern in patterns:
+            if re.match(pattern, stripped):
+                # 去掉编号部分
+                title_text = re.sub(pattern, '', stripped).strip()
+                # 如果去掉编号后还有文字，且行长度适中（标题通常不太长），就加粗
+                if title_text and len(title_text) < 60:
+                    # 保留原行的缩进
+                    indent = line[:len(line) - len(line.lstrip())]
+                    result.append(f'{indent}**{title_text}**')
+                    removed_count += 1
+                    matched = True
+                break
+
+        if not matched:
+            result.append(line)
+
+    if removed_count > 0:
+        print(f"后处理：去掉了 {removed_count} 个章节编号并加粗标题")
+
+    return '\n'.join(result)
 
 
 def apply_title_prefix(content, prefix):
@@ -563,7 +738,10 @@ def process_articles():
 
     print(f"发现 {len(files_to_process)} 个文件待处理")
 
-    for file_path, relative_path in files_to_process:
+    for file_index, (file_path, relative_path) in enumerate(files_to_process):
+        if file_index > 0 and API_CALL_INTERVAL > 0:
+            print(f"等待 {API_CALL_INTERVAL} 秒后处理下一个文件（避免API限流）...")
+            time.sleep(API_CALL_INTERVAL)
         print(f"\n处理文件: {relative_path}")
         content, title = "", "未知标题"
 
@@ -609,7 +787,13 @@ def process_articles():
         prompt = build_prompt(matched_template, segment_info_str, content, title_prefix_hint, MIN_BENEFIT_HITS)
 
         rewritten_content = None
+        best_content = None
+        best_pass_count = -1
+        best_attempt = 0
         for attempt in range(MAX_RETRY + 1):
+            if attempt > 0 and API_CALL_INTERVAL > 0:
+                print(f"等待 {API_CALL_INTERVAL} 秒后重试（避免API限流）...")
+                time.sleep(API_CALL_INTERVAL)
             print(f"调用 LLM 改写文章（第 {attempt + 1}/{MAX_RETRY + 1} 次）...")
             rewritten_content = call_llm_api(prompt, system_prompt=system_role or None)
             if rewritten_content is None or not rewritten_content.strip():
@@ -621,17 +805,42 @@ def process_articles():
             section_hits = count_section_pattern_hits(rewritten_content)
             marketing_hits = count_marketing_hits(rewritten_content)
             local_scene_hits = count_local_scene_hits(rewritten_content)
+            title_pain_hits = count_title_pain_hits(rewritten_content)
+            opening_case_hits = count_opening_case_hits(rewritten_content)
+            forward_hook_hits = count_forward_hook_hits(rewritten_content)
             print(f"实际利益关键词命中: {hits}/{MIN_BENEFIT_HITS}")
             print(f"原创信号词命中: {originality_hits}/{MIN_ORIGINALITY_HITS}")
             print(f"章节编号检测: {section_hits} (应为0)")
             print(f"营销话术检测: {marketing_hits} (应为0)")
             print(f"本地场景词命中: {local_scene_hits}/{MIN_LOCAL_SCENE_HITS}")
+            print(f"标题痛点词命中: {title_pain_hits}/{MIN_TITLE_PAIN_HITS}")
+            print(f"开头案例词命中: {opening_case_hits}/{MIN_OPENING_CASE_HITS}")
+            print(f"转发钩子词命中: {forward_hook_hits}/{MIN_FORWARD_HOOK_HITS}")
+            # 计算通过项数量并记录最优版本
+            pass_count = 0
+            if hits >= MIN_BENEFIT_HITS: pass_count += 1
+            if originality_hits >= MIN_ORIGINALITY_HITS: pass_count += 1
+            if section_hits == 0: pass_count += 1
+            if marketing_hits == 0: pass_count += 1
+            if local_scene_hits >= MIN_LOCAL_SCENE_HITS: pass_count += 1
+            if title_pain_hits >= MIN_TITLE_PAIN_HITS: pass_count += 1
+            if opening_case_hits >= MIN_OPENING_CASE_HITS: pass_count += 1
+            if forward_hook_hits >= MIN_FORWARD_HOOK_HITS: pass_count += 1
+
+            if pass_count > best_pass_count:
+                best_pass_count = pass_count
+                best_content = rewritten_content
+                best_attempt = attempt + 1
+
             if (hits >= MIN_BENEFIT_HITS
                     and originality_hits >= MIN_ORIGINALITY_HITS
                     and section_hits == 0
                     and marketing_hits == 0
-                    and local_scene_hits >= MIN_LOCAL_SCENE_HITS):
-                print("校验通过")
+                    and local_scene_hits >= MIN_LOCAL_SCENE_HITS
+                    and title_pain_hits >= MIN_TITLE_PAIN_HITS
+                    and opening_case_hits >= MIN_OPENING_CASE_HITS
+                    and forward_hook_hits >= MIN_FORWARD_HOOK_HITS):
+                print("校验通过（8/8项全部通过）")
                 break
 
             print("校验未通过，追加更严格要求到 Prompt")
@@ -663,14 +872,40 @@ def process_articles():
                     f"必须包含至少 {MIN_LOCAL_SCENE_HITS} 个广东本地企业（深圳/东莞/佛山/中山/广州等）的真实踩坑场景或服务案例，"
                     f"每个场景包含具体问题、原因、后果，使用'我们经手''我们服务'等第一人称复盘口吻。"
                 )
+            if title_pain_hits < MIN_TITLE_PAIN_HITS:
+                reinforce_parts.append(
+                    f"上一版标题缺少痛点词。请严格重写标题：必须采用「痛点+悬念」结构，"
+                    f"标题前半句必须出现具体痛点词（评不上/被刷下来/拿不到补贴/丢订单/错过/被驳回/来不及），"
+                    f"禁止纯行业热点名词开头（如「WIPO最新榜单」「XX基地投运」），标题必须包含行业关键词。"
+                )
+            if opening_case_hits < MIN_OPENING_CASE_HITS:
+                reinforce_parts.append(
+                    f"上一版开头缺少案例要素。请严格重写开头：开头第一句必须是具体案例，"
+                    f"禁止从新闻事件/政策文件讲起，禁止用「最近」「近日」「随着」等套话开头。"
+                    f"前300字内必须出现具体城市（深圳/东莞/佛山/中山/广州）+具体行业+具体错误+具体后果。"
+                )
+            if forward_hook_hits < MIN_FORWARD_HOOK_HITS:
+                reinforce_parts.append(
+                    f"上一版文末缺少转发钩子。请严格重写文末：必须包含转发价值说明，"
+                    f"明确告诉读者适合转发给谁（CTO/研发负责人/项目申报同事/财务/老板）以及转发的实际价值"
+                    f"（能避免什么损失/获得什么收益），禁止「觉得有用就转发」等空洞表述。"
+                )
             reinforce = "\n\n【重要补充】" + " ".join(reinforce_parts)
             prompt = build_prompt(matched_template, segment_info_str, content, title_prefix_hint, MIN_BENEFIT_HITS) + reinforce
 
         if rewritten_content is None or not rewritten_content.strip():
             continue
 
+        # 使用最优版本（校验通过项最多的版本）
+        if best_content and best_pass_count < 8:
+            rewritten_content = best_content
+            print(f"使用第{best_attempt}次尝试的最优版本（通过{best_pass_count}/8项校验）")
+
         if title_prefix_hint:
             rewritten_content = apply_title_prefix(rewritten_content, title_prefix_hint)
+
+        # 后处理：去掉章节编号并加粗标题
+        rewritten_content = remove_section_numbers(rewritten_content)
 
         frontmatter = build_frontmatter(
             matched_segment_id, matched_seg, title,
